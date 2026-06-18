@@ -1,0 +1,14 @@
+# Zależności (pobierają się same przez npm install)
+node_modules/
+
+# Pliki środowiskowe (hasła, tokeny)
+.env
+.env.local
+
+# Baza danych
+wiedzmin.sqlite
+*.db
+
+# Pliki systemowe i logi
+npm-debug.log*
+.DS_Store

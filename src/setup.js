@@ -23,6 +23,11 @@ const CREATE_PLAYERS = `
         hp INTEGER DEFAULT 0,
         max_hp INTEGER DEFAULT 0,
         win_streak INTEGER DEFAULT 0,
+        bought_str INTEGER DEFAULT 0,
+        bought_dex INTEGER DEFAULT 0,
+        bought_intel INTEGER DEFAULT 0,
+        bought_wit INTEGER DEFAULT 0,
+        bought_luck INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
 `;
@@ -32,7 +37,21 @@ const MIGRATIONS = [
     "ALTER TABLE players ADD COLUMN action_points INTEGER DEFAULT 10",
     "ALTER TABLE players ADD COLUMN max_action_points INTEGER DEFAULT 10",
     "ALTER TABLE players ADD COLUMN last_ap_update INTEGER DEFAULT 0",
-    "ALTER TABLE players ADD COLUMN win_streak INTEGER DEFAULT 0"
+    "ALTER TABLE players ADD COLUMN win_streak INTEGER DEFAULT 0",
+    "ALTER TABLE players ADD COLUMN bought_str INTEGER DEFAULT 0",
+    "ALTER TABLE players ADD COLUMN bought_dex INTEGER DEFAULT 0",
+    "ALTER TABLE players ADD COLUMN bought_intel INTEGER DEFAULT 0",
+    "ALTER TABLE players ADD COLUMN bought_wit INTEGER DEFAULT 0",
+    "ALTER TABLE players ADD COLUMN bought_luck INTEGER DEFAULT 0",
+    "ALTER TABLE players ADD COLUMN stamina INTEGER DEFAULT 100",
+    "ALTER TABLE players ADD COLUMN last_stamina_reset TEXT DEFAULT ''",
+    "ALTER TABLE players ADD COLUMN ears INTEGER DEFAULT 0",
+    "ALTER TABLE players ADD COLUMN honor INTEGER DEFAULT 1000",
+    "ALTER TABLE players ADD COLUMN arena_wins INTEGER DEFAULT 0",
+    "ALTER TABLE players ADD COLUMN arena_losses INTEGER DEFAULT 0",
+    "ALTER TABLE players ADD COLUMN last_arena_fight INTEGER DEFAULT 0",
+    "ALTER TABLE players ADD COLUMN daily_streak INTEGER DEFAULT 0",
+    "ALTER TABLE players ADD COLUMN last_daily TEXT DEFAULT ''"
 ];
 
 
@@ -58,6 +77,17 @@ const CREATE_ITEMS = `
     )
 `;
 
+
+// Postep gracza w lochach (Etap 6): ile etapow danej lokacji pokonano.
+const CREATE_DUNGEON_PROGRESS = `
+    CREATE TABLE IF NOT EXISTS dungeon_progress (
+        discord_id TEXT NOT NULL,
+        location TEXT NOT NULL,
+        stage INTEGER DEFAULT 0,
+        PRIMARY KEY (discord_id, location)
+    )
+`;
+
 async function createDatabase() {
     try {
         console.log('Przygotowuję bazę SQLite (Etap 2: lochy + punkty akcji)...');
@@ -68,6 +98,9 @@ async function createDatabase() {
 
         await db.exec(CREATE_ITEMS);
         console.log('✅ Tabela "items" gotowa.');
+
+        await db.exec(CREATE_DUNGEON_PROGRESS);
+        console.log('✅ Tabela "dungeon_progress" gotowa.');
 
         // Migracje: dodaj brakujace kolumny. Jesli juz istnieja, SQLite rzuci blad
         // "duplicate column name" - ignorujemy go, to znaczy ze kolumna juz jest.

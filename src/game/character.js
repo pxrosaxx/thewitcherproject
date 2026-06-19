@@ -48,6 +48,31 @@ function damageReduction(defenseStat) {
     return defenseStat / (defenseStat + 80);
 }
 
+/**
+ * Przetwarza zdobyty exp: podbija poziom dopoki starcza exp, przelicza staty
+ * bazowe (z poziomu) i max HP. Modyfikuje obiekt player w miejscu.
+ * Kupione i ekwipunkowe staty NIE sa tu ruszane (sa osobno).
+ * Zwraca tablice osiagnietych poziomow.
+ */
+function levelUpFromExp(player, school) {
+    const levelsGained = [];
+    while (player.exp >= expForNextLevel(player.level)) {
+        player.exp -= expForNextLevel(player.level);
+        player.level += 1;
+        levelsGained.push(player.level);
+    }
+    if (levelsGained.length > 0) {
+        const st = getStatsAtLevel(school, player.level);
+        player.str = Math.round(st.str);
+        player.dex = Math.round(st.dex);
+        player.intel = Math.round(st.intel);
+        player.wit = Math.round(st.wit);
+        player.luck = Math.round(st.luck);
+        player.max_hp = calculateMaxHp(st, player.level);
+    }
+    return levelsGained;
+}
+
 module.exports = {
     STAT_KEYS,
     getStatsAtLevel,
@@ -56,5 +81,6 @@ module.exports = {
     CRIT_MULT,
     critChance,
     dodgeChance,
-    damageReduction
+    damageReduction,
+    levelUpFromExp
 };

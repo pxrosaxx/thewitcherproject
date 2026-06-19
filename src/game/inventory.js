@@ -95,6 +95,14 @@ async function removeItem(db, discordId, rowId) {
     return item;
 }
 
+/** Aktualizuje poziom, rzadkosc i staty przedmiotu (uzywane przez kowala). */
+async function setItemStats(db, rowId, itemLevel, rarity, stats) {
+    await db.run(
+        `UPDATE items SET item_level = ?, rarity = ?, str = ?, dex = ?, intel = ?, wit = ?, luck = ? WHERE id = ?`,
+        itemLevel, rarity, stats.str, stats.dex, stats.intel, stats.wit, stats.luck, rowId
+    );
+}
+
 /** Bonus statow z zalozonego ekwipunku (z premia za Szkole). */
 async function getEquipmentBonus(db, discordId, schoolKey) {
     const map = await getEquippedMap(db, discordId);
@@ -104,5 +112,5 @@ async function getEquipmentBonus(db, discordId, schoolKey) {
 
 module.exports = {
     rowToInstance, addItem, getBackpack, getEquippedMap, getItem,
-    equipItem, unequipSlot, removeItem, getEquipmentBonus
+    equipItem, unequipSlot, removeItem, setItemStats, getEquipmentBonus
 };

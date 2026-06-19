@@ -121,20 +121,20 @@ function tickEffects(c, log) {
         if (e.type === 'burn') {
             const dmg = Math.max(1, Math.round(e.damage * (1 - resist)));
             c.hp -= dmg;
-            log.push(`🔥 ${c.emoji} ${c.name} płonie i traci ${dmg} HP`);
+            log.push(`**${c.name}** płonie i traci ${dmg} HP`);
         } else if (e.type === 'poison') {
             const dmg = Math.max(1, Math.round(e.damage * e.stacks * (1 - resist)));
             c.hp -= dmg;
-            log.push(`🧪 ${c.emoji} ${c.name} cierpi od trucizny (${e.stacks}x) i traci ${dmg} HP`);
+            log.push(`**${c.name}** cierpi od trucizny (${e.stacks}x) i traci ${dmg} HP`);
         } else if (e.type === 'bleed') {
             const dmg = Math.max(1, Math.round(e.damage * (1 - resist)));
             c.hp -= dmg;
-            log.push(`🩸 ${c.emoji} ${c.name} wykrwawia się i traci ${dmg} HP`);
+            log.push(`**${c.name}** wykrwawia się i traci ${dmg} HP`);
         } else if (e.type === 'regen') {
             const heal = Math.round(c.maxHp * e.pct);
             if (c.hp > 0 && c.hp < c.maxHp) {
                 c.hp = Math.min(c.maxHp, c.hp + heal);
-                log.push(`💚 ${c.emoji} ${c.name} regeneruje ${heal} HP`);
+                log.push(`**${c.name}** regeneruje ${heal} HP`);
             }
         }
     }
@@ -152,15 +152,15 @@ function tickEffects(c, log) {
 function applyDamage(attacker, defender, amount, log, opts = {}) {
     if (defender.blockNext) {
         defender.blockNext = false;
-        log.push(`✨ ${defender.emoji} ${defender.name} blokuje cios Znakiem Quen!`);
+        log.push(`**${defender.name}** blokuje cios Znakiem Quen!`);
         return 0;
     }
     defender.hp -= amount;
 
     if (attacker && attacker.traits.includes('lifesteal')) {
-        const heal = Math.round(amount * 0.4);
+        const heal = Math.round(amount * 0.25);
         attacker.hp = Math.min(attacker.maxHp, attacker.hp + heal);
-        if (heal > 0) log.push(`🩹 ${attacker.emoji} ${attacker.name} wysysa ${heal} HP`);
+        if (heal > 0) log.push(`**${attacker.name}** wysysa ${heal} HP`);
     }
     return amount;
 }
@@ -205,13 +205,13 @@ function rollHit(attacker, defender, multiplier) {
 function strike(attacker, defender, multiplier, log, label = 'atakuje') {
     const res = rollHit(attacker, defender, multiplier);
     if (res.dodged) {
-        log.push(`💨 ${defender.emoji} ${defender.name} unika ciosu`);
+        log.push(`**${defender.name}** unika ciosu`);
         return res;
     }
     const dealt = applyDamage(attacker, defender, res.damage, log);
     if (dealt > 0) {
-        const critTxt = res.crit ? ' **KRYT!**' : '';
-        log.push(`⚔️ ${attacker.emoji} ${attacker.name} ${label} za ${dealt}${critTxt}`);
+        const critTxt = res.crit ? ' *(krytyk)*' : '';
+        log.push(`**${attacker.name}** ${label} za ${dealt}${critTxt}`);
     }
     return res;
 }
@@ -225,38 +225,38 @@ function castSign(attacker, defender, log) {
     switch (sign) {
         case 'igni': {
             const res = rollHit(attacker, defender, 1.7);
-            if (res.dodged) { log.push(`💨 ${defender.emoji} ${defender.name} unika Igni`); break; }
+            if (res.dodged) { log.push(`**${defender.name}** unika Igni`); break; }
             applyDamage(attacker, defender, res.damage, log);
             addEffect(defender, { type: 'burn', damage: Math.round(intel * 0.45), turns: 3 });
-            log.push(`🔥 ${attacker.emoji} ${attacker.name} rzuca **Igni** za ${res.damage}${res.crit ? ' **KRYT!**' : ''} i podpala wroga`);
+            log.push(`**${attacker.name}** rzuca **Igni** za ${res.damage}${res.crit ? ' *(krytyk)*' : ''} i podpala wroga`);
             break;
         }
         case 'aard': {
             const res = rollHit(attacker, defender, 1.5);
             if (!res.dodged) applyDamage(attacker, defender, res.damage, log);
             addEffect(defender, { type: 'stun', turns: 1 });
-            log.push(`🌀 ${attacker.emoji} ${attacker.name} rzuca **Aard** za ${res.dodged ? 0 : res.damage} i ogłusza wroga`);
+            log.push(`**${attacker.name}** rzuca **Aard** za ${res.dodged ? 0 : res.damage} i ogłusza wroga`);
             break;
         }
         case 'quen': {
             attacker.blockNext = true;
             const res = rollHit(attacker, defender, 1.2);
             if (!res.dodged) applyDamage(attacker, defender, res.damage, log);
-            log.push(`✨ ${attacker.emoji} ${attacker.name} rzuca **Quen** (tarcza) i zadaje ${res.dodged ? 0 : res.damage}`);
+            log.push(`**${attacker.name}** rzuca **Quen** (tarcza) i zadaje ${res.dodged ? 0 : res.damage}`);
             break;
         }
         case 'yrden': {
             const res = rollHit(attacker, defender, 1.4);
             if (!res.dodged) applyDamage(attacker, defender, res.damage, log);
             addEffect(defender, { type: 'weaken', pct: 0.3, turns: 2 });
-            log.push(`🟣 ${attacker.emoji} ${attacker.name} rzuca **Yrden** za ${res.dodged ? 0 : res.damage} i osłabia wroga`);
+            log.push(`**${attacker.name}** rzuca **Yrden** za ${res.dodged ? 0 : res.damage} i osłabia wroga`);
             break;
         }
         case 'axii': {
             const res = rollHit(attacker, defender, 1.1);
             if (!res.dodged) applyDamage(attacker, defender, res.damage, log);
             addEffect(defender, { type: 'confusion', turns: 1 });
-            log.push(`😵 ${attacker.emoji} ${attacker.name} rzuca **Axii** za ${res.dodged ? 0 : res.damage} — wróg zaatakuje sam siebie`);
+            log.push(`**${attacker.name}** rzuca **Axii** za ${res.dodged ? 0 : res.damage} — wróg zaatakuje sam siebie`);
             break;
         }
     }
@@ -269,7 +269,7 @@ function performAttack(attacker, defender, log) {
             strike(attacker, defender, attacker.weaponMult, log, 'tnie');
             const secondChance = Math.min(0.5, 0.15 + attacker.stats.dex * 0.008);
             if (defender.hp > 0 && chance(secondChance)) {
-                log.push(`🐈‍⬛ Refleks! ${attacker.name} uderza ponownie`);
+                log.push(`Refleks! **${attacker.name}** uderza ponownie`);
                 strike(attacker, defender, attacker.weaponMult, log, 'tnie');
             }
             break;
@@ -279,7 +279,7 @@ function performAttack(attacker, defender, log) {
                 const res = strike(attacker, defender, attacker.weaponMult, log, i === 0 ? 'tnie pierwszym ostrzem' : 'tnie drugim ostrzem');
                 if (res.crit && !res.dodged) {
                     addEffect(defender, { type: 'bleed', damage: Math.round(attacker.stats.dex * 0.28), turns: 2 });
-                    log.push(`🩸 Krytyczne cięcie powoduje krwawienie!`);
+                    log.push(`Krytyczne cięcie powoduje krwawienie!`);
                 }
             }
             break;
@@ -296,7 +296,7 @@ function performAttack(attacker, defender, log) {
             const res = strike(attacker, defender, attacker.weaponMult, log, 'ciska bombą');
             if (!res.dodged) {
                 addEffect(defender, { type: 'poison', damage: Math.round(attacker.stats.intel * 0.25), stacks: 1, turns: 3 });
-                log.push(`🧪 Mikstura żre wroga (trucizna)`);
+                log.push(`Mikstura żre wroga (trucizna)`);
             }
             break;
         }
@@ -307,7 +307,7 @@ function performAttack(attacker, defender, log) {
             const res = strike(attacker, defender, attacker.weaponMult, log, 'atakuje');
             if (!res.dodged && attacker.traits.includes('venomous')) {
                 addEffect(defender, { type: 'poison', damage: Math.round(attacker.stats.str * 0.2), stacks: 1, turns: 3 });
-                log.push(`🧪 ${defender.emoji} ${defender.name} zostaje zatruty`);
+                log.push(`**${defender.name}** zostaje zatruty`);
             }
             break;
         }
@@ -327,12 +327,15 @@ function simulateCombat(playerC, monsterC) {
     const playerFirst = playerC.stats.dex >= monsterC.stats.dex;
     const order = playerFirst ? [playerC, monsterC] : [monsterC, playerC];
     if (!playerFirst) {
-        log.push(`⚡ ${monsterC.emoji} ${monsterC.name} jest szybszy i atakuje pierwszy!`);
+        log.push(`**${monsterC.name}** jest szybszy i atakuje pierwszy!`);
     }
 
-    // Mantykora wchodzi do walki z wieczna regeneracja (mutageny).
+    // Mantykora wchodzi do walki z wieczna regeneracja (mutageny) - dotyczy obu stron (PvP).
     if (playerC.schoolKey === 'mantykora') {
         playerC.effects.push({ type: 'regen', pct: 0.018, turns: Infinity });
+    }
+    if (monsterC.schoolKey === 'mantykora') {
+        monsterC.effects.push({ type: 'regen', pct: 0.018, turns: Infinity });
     }
 
     const MAX_ROUNDS = 60;
@@ -350,7 +353,7 @@ function simulateCombat(playerC, monsterC) {
 
             // Ogluszenie - tracimy ture.
             if (hasEffect(attacker, 'stun')) {
-                log.push(`💫 ${attacker.emoji} ${attacker.name} jest ogłuszony i traci turę`);
+                log.push(`**${attacker.name}** jest ogłuszony i traci turę`);
                 attacker.effects = attacker.effects.map((e) =>
                     e.type === 'stun' ? { ...e, turns: e.turns - 1 } : e
                 ).filter((e) => e.turns > 0);
@@ -364,7 +367,7 @@ function simulateCombat(playerC, monsterC) {
                 attacker.effects = attacker.effects.map((e) =>
                     e.type === 'confusion' ? { ...e, turns: e.turns - 1 } : e
                 ).filter((e) => e.turns > 0);
-                log.push(`😵 ${attacker.emoji} ${attacker.name} w amoku atakuje samego siebie!`);
+                log.push(`**${attacker.name}** w amoku atakuje samego siebie!`);
             }
 
             performAttack(attacker, realDefender, log);

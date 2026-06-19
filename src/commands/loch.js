@@ -4,238 +4,187 @@ const {
 } = require('discord.js');
 const getDbConnection = require('../db');
 const schools = require('../data/schools');
+const { LOCATIONS, LOCATION_ORDER } = require('../data/monsters');
 const {
-    LOCATIONS, LOCATION_ORDER, getMonsterForLocation, unlockedLocations
-} = require('../data/monsters');
-const {
-    combatantFromPlayer, combatantFromMonster, simulateCombat
-} = require('../game/combat');
-const { getStatsAtLevel, calculateMaxHp, expForNextLevel } = require('../game/character');
+    getBoss, getAllProgress, getProgress, setProgress, STAGES_PER_LOCATION, FINAL_STAGE_INDEX
+} = require('../data/dungeons');
+const { combatantFromPlayer, combatantFromMonster, simulateCombat } = require('../game/combat');
+const { calculateMaxHp, expForNextLevel, levelUpFromExp } = require('../game/character');
 const { refreshActionPoints, spendActionPoint, formatDuration } = require('../game/actionpoints');
-const { baseEmbed, progressBar } = require('../utils/embeds');
-const { effectiveStats, SLOT_ORDER, rollDrop, formatItem, RARITY } = require('../game/equipment');
+const {
+    effectiveStats, SLOT_ORDER, rollDrop, rollRarity, makeItemInstance, RARITY, formatItem
+} = require('../game/equipment');
+const { ITEMS } = require('../data/items');
 const { getEquippedMap, addItem } = require('../game/inventory');
+const { baseWithBought } = require('../game/training');
+const { baseEmbed, progressBar } = require('../utils/embeds');
 
-// Wizualne oznaczenie trudnosci lokacji wg przesuniecia poziomu.
-const TRUDNOSC = ['🟢 łatwe', '🟡 umiarkowane', '🟠 trudne', '🔴 bardzo trudne', '💀 ekstremalne'];
-const STYL = [ButtonStyle.Success, ButtonStyle.Primary, ButtonStyle.Primary, ButtonStyle.Danger, ButtonStyle.Danger];
-
-/** Skraca dziennik walki do czytelnej dlugosci. */
-function formatLog(log, maxLines = 16) {
+function formatLog(log, maxLines = 14) {
     if (log.length <= maxLines) return log.join('\n');
-    const head = log.slice(0, maxLines - 3);
-    const tail = log.slice(-3);
-    return `${head.join('\n')}\n*… pominięto ${log.length - maxLines} akcji …*\n${tail.join('\n')}`;
+    return `${log.slice(0, maxLines - 3).join('\n')}\n*… pominięto ${log.length - maxLines} akcji …*\n${log.slice(-3).join('\n')}`;
+}
+
+/** Gwarantowany przedmiot z finałowego bossa (dobra rzadkość). */
+function bossDrop(loc, level) {
+    const rarity = Math.max(3, rollRarity(loc.levelOffset, true));
+    let pool = ITEMS.filter((i) => i.rarity === rarity);
+    if (!pool.length) pool = ITEMS.filter((i) => i.rarity <= rarity && i.rarity >= 3);
+    if (!pool.length) pool = ITEMS.filter((i) => i.rarity === 3);
+    const tpl = pool[Math.floor(Math.random() * pool.length)];
+    return makeItemInstance(tpl, level);
 }
 
 module.exports = {
-    data: new SlashCommandBuilder()
-        .setName('loch')
-        .setDescription('Wyrusz na kontrakt — wybierz lokację i zmierz się z potworem.'),
+    data: new SlashCommandBuilder().setName('loch').setDescription('Przemierzaj lokacje, pokonuj bossów etap po etapie.'),
 
     async execute(interaction) {
         const db = await getDbConnection();
         const player = await db.get('SELECT * FROM players WHERE discord_id = ?', interaction.user.id);
-
         if (!player || !player.school) {
-            return interaction.reply({
-                content: 'Najpierw stwórz postać i wybierz Szkołę komendą `/postac`.',
-                flags: MessageFlags.Ephemeral
-            });
+            return interaction.reply({ content: 'Najpierw stwórz postać komendą `/postac`.', flags: MessageFlags.Ephemeral });
         }
 
         const ap = await refreshActionPoints(db, player);
-        const zones = unlockedLocations(player.level);
+        const progress = await getAllProgress(db, interaction.user.id);
 
-        // Embed wyboru lokacji.
-        const selectEmbed = baseEmbed('🗺️ Tablica kontraktów')
+        const embed = baseEmbed('Lochy')
             .setDescription(
-                `Wiedźminie **${player.name}**, gdzie ruszasz na łów?\n\n` +
-                `⚡ **Punkty akcji:** ${ap.points}/${ap.max}` +
-                (ap.points < ap.max ? `  *(następny za ${formatDuration(ap.secondsToNext)})*` : '') +
-                `\n🔥 **Passa zwycięstw:** ${player.win_streak || 0}`
+                `**${player.name}** — punkty akcji: **${ap.points}/${ap.max}**` +
+                (ap.points < ap.max ? `  (następny za ${formatDuration(ap.secondsToNext)})` : '')
             );
 
-        for (const key of zones) {
-            const loc = LOCATIONS[key];
-            selectEmbed.addFields({
-                name: `${loc.emoji} ${loc.name}`,
-                value: `${TRUDNOSC[loc.levelOffset]} • od ${loc.minLevel} poz.\n*${loc.intro}*`,
-                inline: false
-            });
-        }
-
-        // Brak punktow akcji - pokazujemy info i konczymy.
-        if (ap.points <= 0) {
-            selectEmbed.setFooter({ text: `Brak punktów akcji — wróć za ${formatDuration(ap.secondsToNext)}` });
-            return interaction.reply({ embeds: [selectEmbed] });
-        }
-
-        // Przyciski lokacji (max 5, miesci sie w jednym rzedzie).
         const row = new ActionRowBuilder();
-        zones.forEach((key) => {
+        let anyPlayable = false;
+
+        for (const key of LOCATION_ORDER) {
             const loc = LOCATIONS[key];
-            row.addComponents(
-                new ButtonBuilder()
-                    .setCustomId(`loch_${key}`)
-                    .setLabel(loc.name)
-                    .setEmoji(loc.emoji)
-                    .setStyle(STYL[loc.levelOffset])
-            );
-        });
+            const stage = progress[key] || 0;
+            const locked = player.level < loc.minLevel;
+            const done = stage >= STAGES_PER_LOCATION;
 
-        await interaction.reply({ embeds: [selectEmbed], components: [row] });
+            let status;
+            if (locked) {
+                status = `_Zablokowane — wymaga ${loc.minLevel} poz._`;
+            } else if (done) {
+                status = '**Ukończono** ✓';
+            } else {
+                const next = getBoss(key, stage);
+                const label = stage === FINAL_STAGE_INDEX ? 'Finałowy boss' : `Etap ${stage + 1}/${STAGES_PER_LOCATION}`;
+                status = `${label} — następny: **${next.name}** (poz. ${next.level})`;
+            }
+            embed.addFields({ name: `${loc.name}`, value: status, inline: false });
+
+            if (!locked && !done) {
+                anyPlayable = true;
+                row.addComponents(
+                    new ButtonBuilder()
+                        .setCustomId(`loch_${key}`)
+                        .setLabel(loc.name)
+                        .setStyle(stage === FINAL_STAGE_INDEX ? ButtonStyle.Danger : ButtonStyle.Primary)
+                        .setDisabled(ap.points <= 0)
+                );
+            }
+        }
+
+        if (ap.points <= 0) {
+            embed.setFooter({ text: `Brak punktów akcji — wróć za ${formatDuration(ap.secondsToNext)}` });
+        }
+
+        const components = anyPlayable ? [row] : [];
+        await interaction.reply({ embeds: [embed], components });
+        if (!anyPlayable || ap.points <= 0) return;
+
         const message = await interaction.fetchReply();
-
         let choice;
         try {
             choice = await message.awaitMessageComponent({
                 filter: (i) => i.user.id === interaction.user.id && i.customId.startsWith('loch_'),
-                componentType: ComponentType.Button,
-                time: 60000
+                componentType: ComponentType.Button, time: 60000
             });
         } catch {
-            // Czas minal - wygaszamy przyciski.
-            const expired = baseEmbed('🗺️ Tablica kontraktów')
-                .setDescription('Zwlekałeś zbyt długo. Kontrakt przepadł — użyj `/loch` ponownie.');
-            await interaction.editReply({ embeds: [expired], components: [] }).catch(() => {});
+            await interaction.editReply({ components: [] }).catch(() => {});
             return;
         }
 
-        // Ponowne pobranie gracza (mogl sie zmienic) i sprawdzenie AP.
         const fresh = await db.get('SELECT * FROM players WHERE discord_id = ?', interaction.user.id);
         await refreshActionPoints(db, fresh);
         if ((fresh.action_points || 0) <= 0) {
-            await choice.update({
-                embeds: [baseEmbed('⚡ Brak sił').setDescription('Nie masz już punktów akcji na ten kontrakt.')],
-                components: []
-            });
-            return;
+            return choice.update({ embeds: [baseEmbed('Lochy').setDescription('Nie masz już punktów akcji.')], components: [] });
         }
 
-        const locationKey = choice.customId.replace('loch_', '');
-        const loc = LOCATIONS[locationKey];
+        const key = choice.customId.replace('loch_', '');
+        const loc = LOCATIONS[key];
+        const stage = await getProgress(db, interaction.user.id, key);
+        if (stage >= STAGES_PER_LOCATION) {
+            return choice.update({ embeds: [baseEmbed('Lochy').setDescription('Ta lokacja jest już ukończona.')], components: [] });
+        }
 
-        // Wydajemy 1 AP i generujemy potwora.
         await spendActionPoint(db, fresh);
-        const monster = getMonsterForLocation(locationKey, fresh.level);
 
+        const boss = getBoss(key, stage);
         const school = schools[fresh.school];
 
-        // Efektywne statystyki = bazowe (z poziomu) + ekwipunek.
+        // Efektywne staty = poziom + trening + ekwipunek
         const equippedMap = await getEquippedMap(db, interaction.user.id);
         const equippedArr = SLOT_ORDER.map((sl) => equippedMap[sl]).filter(Boolean);
-        const baseStats = { str: fresh.str, dex: fresh.dex, intel: fresh.intel, wit: fresh.wit, luck: fresh.luck };
-        const eff = effectiveStats(baseStats, equippedArr, fresh.school);
+        const eff = effectiveStats(baseWithBought(fresh), equippedArr, fresh.school);
         const combatPlayer = { ...fresh, ...eff, max_hp: calculateMaxHp(eff, fresh.level) };
 
-        const pc = combatantFromPlayer(combatPlayer, school);
-        const mc = combatantFromMonster(monster);
-        const result = simulateCombat(pc, mc);
+        const result = simulateCombat(combatantFromPlayer(combatPlayer, school), combatantFromMonster(boss));
         const won = result.winner === 'player';
 
-        // Lup: szansa na przedmiot przy zwyciestwie.
-        let drop = null;
-        if (won) {
-            drop = rollDrop(monster.level, loc.levelOffset, monster.isElite);
-            if (drop) await addItem(db, interaction.user.id, drop);
-        }
+        const isFinal = stage === FINAL_STAGE_INDEX;
+        const stageLabel = isFinal ? 'Finałowy boss' : `Etap ${stage + 1}/${STAGES_PER_LOCATION}`;
 
-        // --- Nagrody i awans ---
-        let gainedExp = 0, gainedCrowns = 0, streakBonus = 0;
-        let newStreak = fresh.win_streak || 0;
+        let drop = null;
         const levelsGained = [];
 
         if (won) {
-            gainedExp = monster.expReward;
-            gainedCrowns = monster.crownReward;
-            newStreak += 1;
+            await setProgress(db, interaction.user.id, key, stage + 1);
 
-            // Premia za passe: co 5 zwyciestw z rzedu - dodatkowe korony.
-            if (newStreak % 5 === 0) {
-                streakBonus = newStreak * 5;
-                gainedCrowns += streakBonus;
-            }
+            fresh.exp += boss.expReward;
+            fresh.crowns += boss.crownReward;
+            levelsGained.push(...levelUpFromExp(fresh, school));
 
-            fresh.exp += gainedExp;
-            fresh.crowns += gainedCrowns;
+            // Łup: finałowy boss gwarantuje przedmiot, mini-boss ma szansę.
+            drop = isFinal ? bossDrop(loc, boss.level) : rollDrop(boss.level, loc.levelOffset, false);
+            if (drop) await addItem(db, interaction.user.id, drop);
 
-            // Petla awansow.
-            while (fresh.exp >= expForNextLevel(fresh.level)) {
-                fresh.exp -= expForNextLevel(fresh.level);
-                fresh.level += 1;
-                levelsGained.push(fresh.level);
-            }
-            if (levelsGained.length > 0) {
-                const st = getStatsAtLevel(school, fresh.level);
-                fresh.str = Math.round(st.str);
-                fresh.dex = Math.round(st.dex);
-                fresh.intel = Math.round(st.intel);
-                fresh.wit = Math.round(st.wit);
-                fresh.luck = Math.round(st.luck);
-                fresh.max_hp = calculateMaxHp(st, fresh.level);
-            }
-        } else {
-            newStreak = 0;
+            fresh.hp = fresh.max_hp;
+            await db.run(
+                `UPDATE players SET exp = ?, crowns = ?, level = ?, str = ?, dex = ?, intel = ?, wit = ?, luck = ?, hp = ?, max_hp = ? WHERE discord_id = ?`,
+                fresh.exp, fresh.crowns, fresh.level, fresh.str, fresh.dex, fresh.intel, fresh.wit, fresh.luck, fresh.hp, fresh.max_hp, interaction.user.id
+            );
         }
 
-        // Po walce leczymy do pelna (na razie brak osobnego systemu leczenia).
-        fresh.hp = fresh.max_hp;
-        fresh.win_streak = newStreak;
-
-        await db.run(
-            `UPDATE players SET exp = ?, crowns = ?, level = ?, str = ?, dex = ?, intel = ?, wit = ?, luck = ?,
-             hp = ?, max_hp = ?, win_streak = ? WHERE discord_id = ?`,
-            fresh.exp, fresh.crowns, fresh.level, fresh.str, fresh.dex, fresh.intel, fresh.wit, fresh.luck,
-            fresh.hp, fresh.max_hp, fresh.win_streak, interaction.user.id
-        );
-
-        // --- Embed wyniku ---
-        const monsterTitle = `${monster.emoji} ${monster.name}${monster.isElite ? ' ⭐' : ''} (poz. ${monster.level})`;
-        const resultEmbed = baseEmbed(won ? '⚔️ Zwycięstwo!' : '💀 Porażka')
-            .setDescription(
-                `${loc.emoji} **${loc.name}**\n` +
-                `Przeciwnik: ${monsterTitle}\n\n` +
-                `${formatLog(result.log)}`
-            );
+        const title = won ? (isFinal ? 'Lokacja ukończona!' : 'Etap pokonany') : 'Porażka';
+        const resultEmbed = baseEmbed(title)
+            .setDescription(`${loc.name} — ${stageLabel}\nPrzeciwnik: **${boss.name}** (poz. ${boss.level})\n\n${formatLog(result.log)}`);
 
         if (won) {
+            const nextStage = stage + 1;
             const expNeeded = expForNextLevel(fresh.level);
-            let nagrody = `🟡 **+${gainedExp}** exp\n👑 **+${gainedCrowns}** koron`;
-            if (streakBonus > 0) nagrody += ` *(w tym +${streakBonus} za passę!)*`;
             resultEmbed.addFields(
-                { name: 'Łup', value: nagrody, inline: false },
-                {
-                    name: 'Postęp',
-                    value: `Poziom ${fresh.level} • ${fresh.exp}/${expNeeded} exp\n${progressBar(fresh.exp, expNeeded)}`,
-                    inline: false
-                }
+                { name: 'Nagroda', value: `+${boss.expReward} exp · +${boss.crowns ?? boss.crownReward} koron`, inline: false },
+                { name: 'Postęp', value: `Poziom ${fresh.level} · ${fresh.exp}/${expNeeded} exp\n${progressBar(fresh.exp, expNeeded)}`, inline: false }
             );
             if (levelsGained.length > 0) {
-                resultEmbed.addFields({
-                    name: '🎉 Awans!',
-                    value: `Osiągnąłeś **poziom ${fresh.level}**! Statystyki wzrosły, a rany się zagoiły.`,
-                    inline: false
-                });
+                resultEmbed.addFields({ name: 'Awans', value: `Osiągnięto **poziom ${fresh.level}**.`, inline: false });
             }
             if (drop) {
-                resultEmbed.addFields({
-                    name: `${RARITY[drop.rarity].emoji} Znaleziono przedmiot!`,
-                    value: `${formatItem(drop)}\n*Sprawdź \`/ekwipunek\`, by go założyć.*`,
-                    inline: false
-                });
+                resultEmbed.addFields({ name: `Łup — ${RARITY[drop.rarity].name}`, value: formatItem(drop), inline: false });
+            }
+            if (isFinal) {
+                resultEmbed.addFields({ name: 'Lokacja zaliczona', value: `Pokonałeś wszystkich bossów **${loc.name}**. Farm zdobywaj w karczmie i arenie.`, inline: false });
+            } else {
+                const next = getBoss(key, nextStage);
+                if (nextStage < STAGES_PER_LOCATION) {
+                    resultEmbed.setFooter({ text: `Następny: ${next.name} (poz. ${next.level})` });
+                }
             }
         } else {
-            resultEmbed.addFields({
-                name: 'Skutek',
-                value: 'Ledwo uszedłeś z życiem. Passa zwycięstw przerwana, ale rany się zagoiły.',
-                inline: false
-            });
+            resultEmbed.addFields({ name: 'Skutek', value: 'Boss okazał się za silny. Rozwiń się i spróbuj ponownie.', inline: false });
         }
-
-        resultEmbed.setFooter({
-            text: `⚡ Punkty akcji: ${fresh.action_points}/${fresh.max_action_points}  •  🔥 Passa: ${newStreak}`
-        });
 
         await choice.update({ embeds: [resultEmbed], components: [] });
     }

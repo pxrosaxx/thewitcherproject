@@ -1,10 +1,10 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const getDbConnection = require('../db');
 const schools = require('../data/schools');
-const { expForNextLevel } = require('../game/character');
+const { expForNextLevel, calculateMaxHp } = require('../game/character');
 const { refreshActionPoints, formatDuration } = require('../game/actionpoints');
 const { getEquipmentBonus } = require('../game/inventory');
-const { calculateMaxHp } = require('../game/character');
+const { baseWithBought } = require('../game/training');
 const { baseEmbed, progressBar } = require('../utils/embeds');
 
 module.exports = {
@@ -17,14 +17,13 @@ module.exports = {
         if (!player) {
             return interaction.reply({
                 content: 'Nie masz jeszcze postaci. Użyj `/postac`, żeby ją stworzyć.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
-
         if (!player.school) {
             return interaction.reply({
                 content: `**${player.name}** czeka jeszcze na wybór Szkoły. Użyj \`/postac\`, żeby dokończyć tworzenie.`,
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -32,41 +31,48 @@ module.exports = {
         const expNeeded = expForNextLevel(player.level);
         const ap = await refreshActionPoints(db, player);
         const bonus = await getEquipmentBonus(db, interaction.user.id, player.school);
+
+        // Efektywne staty = poziom + trening + ekwipunek.
+        const base = baseWithBought(player);
         const eff = {
-            str: player.str + bonus.str, dex: player.dex + bonus.dex, intel: player.intel + bonus.intel,
-            wit: player.wit + bonus.wit, luck: player.luck + bonus.luck
+            str: base.str + bonus.str, dex: base.dex + bonus.dex, intel: base.intel + bonus.intel,
+            wit: base.wit + bonus.wit, luck: base.luck + bonus.luck
         };
         const effMaxHp = calculateMaxHp(eff, player.level);
-        const fmt = (base, b) => b > 0 ? `${base + b} (+${b})` : `${base}`;
+        // Pokazujemy wartosc efektywna; w nawiasie laczny bonus (trening + ekwipunek).
+        const fmt = (key) => {
+            const extra = eff[key] - player[key];
+            return extra > 0 ? `${eff[key]} (+${extra})` : `${eff[key]}`;
+        };
 
-        const apValue = `${ap.points}/${ap.max} ⚡` +
-        (ap.points < ap.max ? `\n*następny za ${formatDuration(ap.secondsToNext)}*` : '');
+        const apValue = `${ap.points}/${ap.max}` +
+            (ap.points < ap.max ? `\n*następny za ${formatDuration(ap.secondsToNext)}*` : '');
+
+        // Awanturnicznosc (resetuje sie o polnocy w karczmie).
+        const today = new Date().toISOString().split('T')[0];
+        const stamina = player.last_stamina_reset === today ? player.stamina : 100;
+        const maxStamina = 100;
 
         const embed = baseEmbed(`${school.emoji} ${player.name}`)
-        .setDescription(`${school.name} — *${school.title}*`)
-        .addFields(
-            { name: 'Poziom', value: `${player.level}`, inline: true },
-            {
-                name: 'Doświadczenie',
-                value: `${player.exp} / ${expNeeded}\n${progressBar(player.exp, expNeeded)}`,
-                   inline: true
-            },
-            { name: 'Korony', value: `${player.crowns} 👑`, inline: true },
-            {
-                name: 'Punkty życia',
-                value: `${effMaxHp} / ${effMaxHp}\n${progressBar(1, 1)}`,
-                   inline: false
-            },
-            { name: 'Punkty akcji', value: apValue, inline: true },
-            { name: 'Passa zwycięstw', value: `${player.win_streak || 0} 🔥`, inline: true },
-            { name: '\u200b', value: '\u200b', inline: true },
-            { name: 'Siła', value: fmt(player.str, bonus.str), inline: true },
-                   { name: 'Zręczność', value: fmt(player.dex, bonus.dex), inline: true },
-                   { name: 'Inteligencja', value: fmt(player.intel, bonus.intel), inline: true },
-                   { name: 'Witalność', value: fmt(player.wit, bonus.wit), inline: true },
-                   { name: 'Szczęście', value: fmt(player.luck, bonus.luck), inline: true },
-                   { name: '\u200b', value: '\u200b', inline: true }
-        );
+            .setDescription(`${school.name} — *${school.title}*`)
+            .addFields(
+                { name: 'Poziom', value: `${player.level}`, inline: true },
+                { name: 'Doświadczenie', value: `${player.exp} / ${expNeeded}\n${progressBar(player.exp, expNeeded)}`, inline: true },
+                { name: 'Korony', value: `${player.crowns}`, inline: true },
+                { name: 'Punkty życia', value: `${effMaxHp} / ${effMaxHp}\n${progressBar(1, 1)}`, inline: false },
+                { name: 'Punkty akcji', value: apValue, inline: true },
+                { name: 'Awanturniczość', value: `${stamina}/${maxStamina}`, inline: true },
+                { name: 'Uszy', value: `${player.ears || 0}`, inline: true },
+                { name: 'Chwała areny', value: `${player.honor ?? 1000} _(${player.arena_wins || 0}W/${player.arena_losses || 0}P)_`, inline: false },
+                { name: 'Siła', value: fmt('str'), inline: true },
+                { name: 'Zręczność', value: fmt('dex'), inline: true },
+                { name: 'Inteligencja', value: fmt('intel'), inline: true },
+                { name: 'Witalność', value: fmt('wit'), inline: true },
+                { name: 'Szczęście', value: fmt('luck'), inline: true },
+                { name: 'Passa zwycięstw', value: `${player.win_streak || 0}`, inline: true },
+                { name: 'Passa logowań', value: `${player.daily_streak || 0} dni`, inline: true }
+            )
+            .setFooter({ text: 'Bonus w nawiasie = trening + ekwipunek' });
 
         await interaction.reply({ embeds: [embed] });
     }

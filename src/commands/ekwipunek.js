@@ -5,7 +5,7 @@ const {
 const getDbConnection = require('../db');
 const schools = require('../data/schools');
 const {
-    SLOTS, SLOT_ORDER, RARITY, statsLine, equipmentBonus
+    SLOTS, SLOT_ORDER, RARITY, statsLine, equipmentBonus, activeSets
 } = require('../game/equipment');
 const { getBackpack, getEquippedMap, equipItem } = require('../game/inventory');
 const { baseEmbed } = require('../utils/embeds');
@@ -23,7 +23,7 @@ async function render(db, discordId, schoolKey) {
     const equippedArr = SLOT_ORDER.map((s) => equippedMap[s]).filter(Boolean);
     const bonus = equipmentBonus(equippedArr, schoolKey);
 
-    const embed = baseEmbed('🎒 Ekwipunek');
+    const embed = baseEmbed('Ekwipunek');
 
     // Zalozone przedmioty per slot
     let equippedText = '';
@@ -31,21 +31,27 @@ async function render(db, discordId, schoolKey) {
         const it = equippedMap[slot];
         const s = SLOTS[slot];
         if (it) {
-            const match = it.school === schoolKey ? ' ✨' : '';
+            const match = it.school === schoolKey ? ' ★' : '';
             equippedText += `${s.emoji} **${s.name}:** ${RARITY[it.rarity].emoji} ${it.name}${match} — _${statsLine(it.stats)}_\n`;
         } else {
             equippedText += `${s.emoji} **${s.name}:** _— puste —_\n`;
         }
     }
     embed.addFields({ name: 'Założone', value: equippedText, inline: false });
-    embed.addFields({ name: 'Łączny bonus z ekwipunku', value: bonusLine(bonus) + '\n✨ = premia za zgodność ze Szkołą (+20%)', inline: false });
+    embed.addFields({ name: 'Łączny bonus z ekwipunku', value: bonusLine(bonus) + '\n★ = premia za zgodność ze Szkołą (+20%)', inline: false });
+
+    const sets = activeSets(equippedArr);
+    if (sets.length > 0) {
+        const setText = sets.map((s) => `**${s.name}** (${s.count}/6): ${statsLine(s.bonus)}`).join('\n');
+        embed.addFields({ name: 'Aktywne komplety', value: `${setText}\n_Pełen przegląd: \`/komplety\`_`, inline: false });
+    }
 
     // Plecak
     if (backpack.length === 0) {
         embed.addFields({ name: 'Plecak', value: '_pusty — zdobywaj przedmioty w lochach (`/loch`)_', inline: false });
     } else {
         const lines = backpack.slice(0, 15).map((it) => {
-            const match = it.school === schoolKey ? ' ✨' : (it.school ? ` (szkoła: ${it.school})` : '');
+            const match = it.school === schoolKey ? ' ★' : (it.school ? ` (szkoła: ${it.school})` : '');
             return `${RARITY[it.rarity].emoji} ${SLOTS[it.slot].emoji} **${it.name}**${match} — _${statsLine(it.stats)}_`;
         });
         let val = lines.join('\n');

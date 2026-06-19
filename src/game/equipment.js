@@ -113,10 +113,72 @@ function equipmentBonus(equipped, schoolKey) {
 }
 
 /** Efektywne statystyki = bazowe (z poziomu) + ekwipunek. */
+// --- KOMPLETY EKWIPUNKU (Etap 8) ---------------------------------------------
+// Komplet = część szkoły. Noszenie 2/4/6 części tej samej szkoły daje rosnący bonus.
+const SET_DEF = {
+    wilk:      { name: 'Komplet Wilka',     stats: { str: 1.0, wit: 0.5 } },
+    kot:       { name: 'Komplet Kota',      stats: { dex: 1.0, luck: 0.4 } },
+    gryf:      { name: 'Komplet Gryfa',     stats: { intel: 1.0, wit: 0.4 } },
+    waz:       { name: 'Komplet Żmii',      stats: { dex: 1.0, luck: 0.5 } },
+    mantykora: { name: 'Komplet Mantykory', stats: { intel: 1.0, wit: 0.5 } }
+};
+const SET_FACTOR = 0.10; // jak mocno bonus rośnie z poziomem sprzętu
+
+/** Mnożnik progu: 0 (<2), 1 (2-3), 3 (4-5), 6 (6 części). */
+function setTierMult(count) {
+    if (count >= 6) return 6;
+    if (count >= 4) return 3;
+    if (count >= 2) return 1;
+    return 0;
+}
+
+/** Grupuje założone przedmioty po szkole (pomija neutralne). */
+function groupBySchool(equipped) {
+    const groups = {};
+    for (const it of equipped) {
+        if (!it || !it.school) continue;
+        (groups[it.school] = groups[it.school] || []).push(it);
+    }
+    return groups;
+}
+
+/** Łączny bonus statów z aktywnych kompletów. */
+function setBonus(equipped) {
+    const total = emptyStats();
+    const groups = groupBySchool(equipped);
+    for (const [sc, items] of Object.entries(groups)) {
+        const def = SET_DEF[sc];
+        const m = setTierMult(items.length);
+        if (!def || m === 0) continue;
+        const avgLvl = items.reduce((a, i) => a + (i.itemLevel || 1), 0) / items.length;
+        const magnitude = Math.round(m * (1 + avgLvl * SET_FACTOR));
+        for (const [stat, w] of Object.entries(def.stats)) total[stat] += Math.round(magnitude * w);
+    }
+    return total;
+}
+
+/** Lista aktywnych kompletów do wyświetlenia (szkoła, nazwa, liczba, próg, bonus). */
+function activeSets(equipped) {
+    const out = [];
+    const groups = groupBySchool(equipped);
+    for (const [sc, items] of Object.entries(groups)) {
+        const count = items.length;
+        if (count < 2 || !SET_DEF[sc]) continue;
+        const m = setTierMult(count);
+        const avgLvl = items.reduce((a, i) => a + (i.itemLevel || 1), 0) / count;
+        const magnitude = Math.round(m * (1 + avgLvl * SET_FACTOR));
+        const bonus = {};
+        for (const [stat, w] of Object.entries(SET_DEF[sc].stats)) bonus[stat] = Math.round(magnitude * w);
+        out.push({ school: sc, name: SET_DEF[sc].name, count, tier: count >= 6 ? 3 : count >= 4 ? 2 : 1, bonus });
+    }
+    return out;
+}
+
 function effectiveStats(baseStats, equipped, schoolKey) {
     const bonus = equipmentBonus(equipped, schoolKey);
+    const set = setBonus(equipped);
     const out = {};
-    for (const k of STAT_KEYS) out[k] = baseStats[k] + bonus[k];
+    for (const k of STAT_KEYS) out[k] = baseStats[k] + bonus[k] + set[k];
     return out;
 }
 
@@ -216,6 +278,7 @@ function formatItem(item, withSchool = true) {
 }
 
 module.exports = {
+    SET_DEF, setBonus, activeSets,
     RARITY, SLOTS, SLOT_ORDER, SCHOOL_OFFENSE, AFFINITY_BONUS,
     generateItemStats, makeItemInstance, equipmentBonus, effectiveStats,
     rollDrop, rollRarity, generateShop, itemPrice, sellPrice,

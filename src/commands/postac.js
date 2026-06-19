@@ -48,7 +48,7 @@ function confirmationEmbed(name, school, maxHp) {
             { name: 'Inteligencja', value: `${school.baseStats.intel}`, inline: true },
             { name: 'Witalność', value: `${school.baseStats.wit}`, inline: true },
             { name: 'Szczęście', value: `${school.baseStats.luck}`, inline: true },
-            { name: 'Punkty życia', value: `${maxHp} ❤️`, inline: true }
+            { name: 'Punkty życia', value: `${maxHp}`, inline: true }
         )
         .setFooter({ text: 'Użyj /profil, aby zobaczyć kartę postaci w dowolnej chwili.' });
 }

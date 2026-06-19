@@ -138,6 +138,16 @@ const ITEMS = [
     { id: 'kus_127', name: 'Wzmacniana kusza', slot: 'kusza', rarity: 3, school: 'gryf' },
     { id: 'kus_128', name: 'Rysia kusza', slot: 'kusza', rarity: 3, school: 'kot' },
     { id: 'kus_129', name: 'Niedźwiedzia kusza', slot: 'kusza', rarity: 4, school: 'wilk' },
+    // --- Uzupełnienie kompletów (Etap 8): brakujące sloty Węża i Mantykory ---
+    { id: 'rek_130', name: 'Rękawice Szkoły Żmii', slot: 'rekawice', rarity: 2, school: 'waz' },
+    { id: 'spo_131', name: 'Spodnie Szkoły Żmii', slot: 'spodnie', rarity: 2, school: 'waz' },
+    { id: 'but_132', name: 'Buty Szkoły Żmii', slot: 'buty', rarity: 2, school: 'waz' },
+    { id: 'kus_133', name: 'Kusza Szkoły Żmii', slot: 'kusza', rarity: 3, school: 'waz' },
+    { id: 'nap_134', name: 'Pancerz Szkoły Mantykory', slot: 'napiersnik', rarity: 3, school: 'mantykora' },
+    { id: 'rek_135', name: 'Rękawice Szkoły Mantykory', slot: 'rekawice', rarity: 2, school: 'mantykora' },
+    { id: 'spo_136', name: 'Spodnie Szkoły Mantykory', slot: 'spodnie', rarity: 2, school: 'mantykora' },
+    { id: 'but_137', name: 'Buty Szkoły Mantykory', slot: 'buty', rarity: 2, school: 'mantykora' },
+    { id: 'kus_138', name: 'Kusza Szkoły Mantykory', slot: 'kusza', rarity: 3, school: 'mantykora' },
 ];
 
 const ITEMS_BY_ID = Object.fromEntries(ITEMS.map((i) => [i.id, i]));

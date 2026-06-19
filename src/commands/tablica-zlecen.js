@@ -10,10 +10,12 @@ const {
 const {
     combatantFromPlayer, combatantFromMonster, simulateCombat
 } = require('../game/combat');
-const { getStatsAtLevel, calculateMaxHp, expForNextLevel } = require('../game/character');
+const { getStatsAtLevel, calculateMaxHp, expForNextLevel, levelUpFromExp } = require('../game/character');
 const { baseEmbed, progressBar } = require('../utils/embeds');
 const { effectiveStats, SLOT_ORDER, rollDrop, formatItem, RARITY } = require('../game/equipment');
 const { getEquippedMap, addItem } = require('../game/inventory');
+const { baseWithBought } = require('../game/training');
+const { buildQuestText } = require('../data/questtext');
 
 // --- AUTOMATYCZNA MIGRACJA BAZY ---
 // Ten fragment upewnia się, że w bazie są kolumny na Energię i Uszy, bez kasowania Twoich postaci.
@@ -25,7 +27,7 @@ async function ensureTavernColumns(db) {
 
 // Sprawdza i odnawia 100 pkt Awanturniczości o północy
 async function refreshStamina(db, player) {
-    const today = new Date().toISOString().split('T')[0]; // Zwraca np. "2026-06-18"[cite: 1, 15]
+    const today = new Date().toISOString().split('T')[0]; // Zwraca np. "2026-06-18"
     let stamina = player.stamina !== undefined ? player.stamina : 100;
     let lastReset = player.last_stamina_reset || '';
 
@@ -59,7 +61,7 @@ module.exports = {
         if (!player || !player.school) {
             return interaction.reply({
                 content: 'Najpierw stwórz postać i wybierz Szkołę komendą `/postac`.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
@@ -69,8 +71,8 @@ module.exports = {
         player.last_stamina_reset = today;
 
         if (player.stamina <= 0) {
-            const noEnergyEmbed = baseEmbed('🍺 Karczma')
-            .setDescription('**Jesteś całkowicie wyczerpany.**\nNie masz już siły na kolejne zlecenia. Wróć tu po północy, aby odzyskać 100 punktów Awanturniczości.');
+            const noEnergyEmbed = baseEmbed('Karczma')
+            .setDescription('Jesteś całkowicie wyczerpany. Nie masz już siły na zlecenia.\nWróć po północy, aby odzyskać 100 punktów Awanturniczości.');
             return interaction.reply({ embeds: [noEnergyEmbed] });
         }
 
@@ -85,8 +87,8 @@ module.exports = {
 
         const quests = [];
         const row = new ActionRowBuilder();
-        const selectEmbed = baseEmbed('🍺 Karczma — Tablica Zleceń')
-        .setDescription(`Witaj, wiedźminie **${player.name}**. Spójrz na tablicę, mamy 3 świeże zlecenia.\n\n⚡ **Awanturniczość:** ${player.stamina}/100\n🔥 **Passa zwycięstw:** ${player.win_streak || 0}`);
+        const selectEmbed = baseEmbed('Karczma — Tablica zleceń')
+        .setDescription(`Witaj, **${player.name}**. Na tablicy wiszą trzy świeże zlecenia.\nAwanturniczość: **${player.stamina}/100**  ·  Passa: **${player.win_streak || 0}**`);
 
         for (const qt of questTypes) {
             // Losujemy lokację z odblokowanych
@@ -107,18 +109,17 @@ module.exports = {
             const expReward = monster.expReward * qt.mult;
             const crownReward = monster.crownReward * qt.mult;
 
-            quests.push({
-                ...qt,
-                loc,
-                monster,
-                expReward,
-                crownReward
-            });
+            // Narracja zlecenia z 3 filarów (tysiące kombinacji).
+            const story = buildQuestText();
 
-            const monsterTitle = `${monster.emoji} ${monster.name} (poz. ${monster.level})`;
+            quests.push({ ...qt, loc, monster, expReward, crownReward, story });
+
             selectEmbed.addFields({
-                name: `Zlecenie ${qt.id + 1}: ${qt.label}`,
-                value: `📍 **Miejsce:** ${loc.name}\n🐺 **Cel:** ${monsterTitle}\n⚡ **Koszt:** -${qt.cost} Awanturniczości\n🏆 **Nagroda:** ${expReward} XP | ${crownReward} 👑`,
+                name: `Zlecenie ${qt.id + 1} — ${qt.label}`,
+                value:
+                    `*${story}*\n` +
+                    `Cel: **${monster.name}** (poz. ${monster.level}) — ${loc.name}\n` +
+                    `Koszt: ${qt.cost} Awanturniczości  ·  Nagroda: ${expReward} exp, ${crownReward} koron`,
                 inline: false
             });
 
@@ -143,7 +144,7 @@ module.exports = {
                                                          time: 60000
             });
         } catch {
-            const expired = baseEmbed('🍺 Karczma').setDescription('Zbyt długo się zastanawiałeś. Ktoś inny wziął te zlecenia — użyj `/karczma` ponownie.');
+            const expired = baseEmbed('Karczma').setDescription('Zbyt długo się zastanawiałeś — ktoś inny wziął te zlecenia. Użyj `/karczma` ponownie.');
             await interaction.editReply({ embeds: [expired], components: [] }).catch(() => {});
             return;
         }
@@ -158,7 +159,7 @@ module.exports = {
 
         if (fresh.stamina < quest.cost) {
             return await choice.update({
-                embeds: [baseEmbed('⚡ Brak sił').setDescription('Zabrakło Ci Awanturniczości na to zlecenie.')],
+                embeds: [baseEmbed('Brak sił').setDescription('Zabrakło Ci Awanturniczości na to zlecenie.')],
                                        components: []
             });
         }
@@ -171,7 +172,7 @@ module.exports = {
         // Przygotowanie statystyk do walki
         const equippedMap = await getEquippedMap(db, interaction.user.id);
         const equippedArr = SLOT_ORDER.map((sl) => equippedMap[sl]).filter(Boolean);
-        const baseStats = { str: fresh.str, dex: fresh.dex, intel: fresh.intel, wit: fresh.wit, luck: fresh.luck };
+        const baseStats = baseWithBought(fresh);
         const eff = effectiveStats(baseStats, equippedArr, fresh.school);
         const combatPlayer = { ...fresh, ...eff, max_hp: calculateMaxHp(eff, fresh.level) };
 
@@ -211,21 +212,8 @@ module.exports = {
             fresh.exp += gainedExp;
             fresh.crowns += gainedCrowns;
 
-            // System awansowania
-            while (fresh.exp >= expForNextLevel(fresh.level)) {
-                fresh.exp -= expForNextLevel(fresh.level);
-                fresh.level += 1;
-                levelsGained.push(fresh.level);
-            }
-            if (levelsGained.length > 0) {
-                const st = getStatsAtLevel(school, fresh.level);
-                fresh.str = Math.round(st.str);
-                fresh.dex = Math.round(st.dex);
-                fresh.intel = Math.round(st.intel);
-                fresh.wit = Math.round(st.wit);
-                fresh.luck = Math.round(st.luck);
-                fresh.max_hp = calculateMaxHp(st, fresh.level);
-            }
+            // System awansowania (wspolny helper)
+            levelsGained.push(...levelUpFromExp(fresh, school));
         } else {
             newStreak = 0;
         }
@@ -242,53 +230,52 @@ module.exports = {
         );
 
         // --- EKRAN WYNIKOWY ---
-        const monsterTitle = `${quest.monster.emoji} ${quest.monster.name} (poz. ${quest.monster.level})`;
-        const resultEmbed = baseEmbed(won ? '⚔️ Zlecenie Ukończone!' : '💀 Zlecenie Zakończone Porażką')
+        const resultEmbed = baseEmbed(won ? 'Zlecenie ukończone' : 'Zlecenie nieudane')
         .setDescription(
-            `${quest.loc.emoji} **${quest.loc.name}**\n` +
-            `Przeciwnik: ${monsterTitle}\n\n` +
+            `*${quest.story}*\n\n` +
+            `${quest.loc.name} — przeciwnik: **${quest.monster.name}** (poz. ${quest.monster.level})\n\n` +
             `${formatLog(result.log)}`
         );
 
         if (won) {
             const expNeeded = expForNextLevel(fresh.level);
-            let nagrody = `🟡 **+${gainedExp}** exp\n👑 **+${gainedCrowns}** koron`;
-            if (streakBonus > 0) nagrody += ` *(w tym +${streakBonus} za passę!)*`;
-            if (earsGained > 0) nagrody += `\n🩸 **+1 Ucho** (zdobyto cenne trofeum!)`;
+            let nagrody = `+${gainedExp} exp · +${gainedCrowns} koron`;
+            if (streakBonus > 0) nagrody += ` *(w tym +${streakBonus} za passę)*`;
+            if (earsGained > 0) nagrody += `\n+1 Ucho — cenne trofeum`;
 
             resultEmbed.addFields(
-                { name: 'Łup', value: nagrody, inline: false },
+                { name: 'Nagroda', value: nagrody, inline: false },
                 {
                     name: 'Postęp',
-                    value: `Poziom ${fresh.level} • ${fresh.exp}/${expNeeded} exp\n${progressBar(fresh.exp, expNeeded)}`,
+                    value: `Poziom ${fresh.level} · ${fresh.exp}/${expNeeded} exp\n${progressBar(fresh.exp, expNeeded)}`,
                                   inline: false
                 }
             );
 
             if (levelsGained.length > 0) {
                 resultEmbed.addFields({
-                    name: '🎉 Awans!',
-                    value: `Osiągnąłeś **poziom ${fresh.level}**! Statystyki wzrosły, a rany się zagoiły.`,
+                    name: 'Awans',
+                    value: `Osiągnięto **poziom ${fresh.level}**. Statystyki wzrosły, a rany się zagoiły.`,
                     inline: false
                 });
             }
             if (drop) {
                 resultEmbed.addFields({
-                    name: `${RARITY[drop.rarity].emoji} Znaleziono przedmiot!`,
-                    value: `${formatItem(drop)}\n*Sprawdź \`/ekwipunek\`, by go założyć.*`,
+                    name: `Łup — ${RARITY[drop.rarity].name}`,
+                    value: `${formatItem(drop)}\n*Załóż w \`/ekwipunek\`.*`,
                                       inline: false
                 });
             }
         } else {
             resultEmbed.addFields({
                 name: 'Skutek',
-                value: 'Potwór okazał się za silny. Zlecenie przepadło, a straconej energii nikt Ci nie zwróci.',
+                value: 'Potwór okazał się za silny. Zlecenie przepadło, a straconej energii nikt nie zwróci.',
                 inline: false
             });
         }
 
         resultEmbed.setFooter({
-            text: `⚡ Awanturniczość: ${fresh.stamina}/100  •  🔥 Passa: ${newStreak}`
+            text: `Awanturniczość: ${fresh.stamina}/100  ·  Passa: ${newStreak}`
         });
 
         await choice.update({ embeds: [resultEmbed], components: [] });

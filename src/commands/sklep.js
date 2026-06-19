@@ -21,11 +21,11 @@ async function render(db, discordId) {
     const offers = generateShop(player.level, 6, shopSeed(discordId));
     const backpack = await getBackpack(db, discordId);
 
-    const embed = baseEmbed('🏪 Sklep wiedźmiński')
-        .setDescription(`Twoje korony: **${player.crowns}** 👑\n*Oferta odświeża się codziennie.*`);
+    const embed = baseEmbed('Sklep wiedźmiński')
+        .setDescription(`Twoje korony: **${player.crowns}**\n*Oferta odświeża się codziennie.*`);
 
     const offerText = offers.map((it, idx) =>
-        `**${idx + 1}.** ${RARITY[it.rarity].emoji} ${SLOTS[it.slot].emoji} **${it.name}** (poz. ${it.itemLevel})\n   _${statsLine(it.stats)}_ — **${it.price}** 👑`
+        `**${idx + 1}.** ${RARITY[it.rarity].emoji} **${it.name}** (poz. ${it.itemLevel})\n   _${statsLine(it.stats)}_ — **${it.price}** koron`
     ).join('\n');
     embed.addFields({ name: 'Na sprzedaż', value: offerText, inline: false });
 
@@ -104,7 +104,7 @@ module.exports = {
                 } else {
                     const gold = sellPrice(item);
                     await db.run('UPDATE players SET crowns = crowns + ? WHERE discord_id = ?', gold, interaction.user.id);
-                    note = `Sprzedano **${item.name}** za ${gold} 👑.`;
+                    note = `Sprzedano **${item.name}** za ${gold} koron.`;
                 }
             }
 

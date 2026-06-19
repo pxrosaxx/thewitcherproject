@@ -11,11 +11,13 @@ const {
     combatantFromPlayer, combatantFromMonster, simulateCombat
 } = require('../game/combat');
 const { getStatsAtLevel, calculateMaxHp, expForNextLevel, levelUpFromExp } = require('../game/character');
-const { baseEmbed, progressBar } = require('../utils/embeds');
+const { baseEmbed, progressBar, authorFor, outcomeColor } = require('../utils/embeds');
 const { effectiveStats, SLOT_ORDER, rollDrop, formatItem, RARITY } = require('../game/equipment');
 const { getEquippedMap, addItem } = require('../game/inventory');
 const { baseWithBought } = require('../game/training');
 const { buildQuestText } = require('../data/questtext');
+const { imageForName } = require('../data/monster_images');
+const { revealCombat } = require('../utils/combat_anim');
 
 // --- AUTOMATYCZNA MIGRACJA BAZY ---
 // Ten fragment upewnia się, że w bazie są kolumny na Energię i Uszy, bez kasowania Twoich postaci.
@@ -95,15 +97,9 @@ module.exports = {
             const locKey = zones[Math.floor(Math.random() * zones.length)];
             const loc = LOCATIONS[locKey];
 
-            // Losujemy potwora
-            const monster = getMonsterForLocation(locKey, player.level);
-
-            // Jeśli to "Długie" zlecenie, wymuszamy elitę dla podbicia emocji
-            if (qt.id === 2 && !monster.isElite) {
-                monster.isElite = true;
-                monster.name = `Elitarny ${monster.name}`;
-                monster.maxHp = Math.floor(monster.maxHp * 1.5);
-            }
+            // "Długie" zlecenie zawsze przeciw elicie — mocniejszy potwór
+            // z wyższego tieru nazw (bez doklejanego przedrostka "Elitarny").
+            const monster = getMonsterForLocation(locKey, player.level, qt.id === 2);
 
             // Skalujemy nagrody względem czasu (kosztu)
             const expReward = monster.expReward * qt.mult;
@@ -229,13 +225,23 @@ module.exports = {
             fresh.hp, fresh.max_hp, fresh.win_streak, fresh.stamina, fresh.last_stamina_reset, (fresh.ears || 0), interaction.user.id
         );
 
-        // --- EKRAN WYNIKOWY ---
-        const resultEmbed = baseEmbed(won ? 'Zlecenie ukończone' : 'Zlecenie nieudane')
-        .setDescription(
-            `*${quest.story}*\n\n` +
-            `${quest.loc.name} — przeciwnik: **${quest.monster.name}** (poz. ${quest.monster.level})\n\n` +
-            `${formatLog(result.log)}`
-        );
+        // --- EKRAN WYNIKOWY (z animacją krok po kroku) ---
+        const monsterImg = imageForName(quest.monster.name);
+        const header = `*${quest.story}*\n\n**${quest.monster.name}** — poziom ${quest.monster.level} · ${quest.loc.name}`;
+        const logText = formatLog(result.log);
+        const displayLines = logText.split('\n');
+
+        const makeFrame = (visible) => {
+            const e = baseEmbed('Walka').setAuthor(authorFor(fresh))
+                .setDescription(`${header}\n\n${visible.join('\n')}`);
+            if (monsterImg) e.setImage(monsterImg);
+            return e;
+        };
+
+        const finalEmbed = baseEmbed(won ? 'Zlecenie ukończone' : 'Zlecenie nieudane')
+            .setColor(outcomeColor(won)).setAuthor(authorFor(fresh))
+            .setDescription(header)
+            .addFields({ name: 'Przebieg walki', value: logText, inline: false });
 
         if (won) {
             const expNeeded = expForNextLevel(fresh.level);
@@ -243,41 +249,23 @@ module.exports = {
             if (streakBonus > 0) nagrody += ` *(w tym +${streakBonus} za passę)*`;
             if (earsGained > 0) nagrody += `\n+1 Ucho — cenne trofeum`;
 
-            resultEmbed.addFields(
+            finalEmbed.addFields(
                 { name: 'Nagroda', value: nagrody, inline: false },
-                {
-                    name: 'Postęp',
-                    value: `Poziom ${fresh.level} · ${fresh.exp}/${expNeeded} exp\n${progressBar(fresh.exp, expNeeded)}`,
-                                  inline: false
-                }
+                { name: 'Postęp', value: `Poziom ${fresh.level} · ${fresh.exp}/${expNeeded} exp\n${progressBar(fresh.exp, expNeeded)}`, inline: false }
             );
-
             if (levelsGained.length > 0) {
-                resultEmbed.addFields({
-                    name: 'Awans',
-                    value: `Osiągnięto **poziom ${fresh.level}**. Statystyki wzrosły, a rany się zagoiły.`,
-                    inline: false
-                });
+                finalEmbed.addFields({ name: 'Awans', value: `Osiągnięto poziom ${fresh.level}. Statystyki wzrosły, a rany się zagoiły.`, inline: false });
             }
             if (drop) {
-                resultEmbed.addFields({
-                    name: `Łup — ${RARITY[drop.rarity].name}`,
-                    value: `${formatItem(drop)}\n*Załóż w \`/ekwipunek\`.*`,
-                                      inline: false
-                });
+                finalEmbed.addFields({ name: `Łup — ${RARITY[drop.rarity].name}`, value: `${formatItem(drop)}\n*Załóż w \`/ekwipunek\`.*`, inline: false });
             }
         } else {
-            resultEmbed.addFields({
-                name: 'Skutek',
-                value: 'Potwór okazał się za silny. Zlecenie przepadło, a straconej energii nikt nie zwróci.',
-                inline: false
-            });
+            finalEmbed.addFields({ name: 'Skutek', value: 'Potwór okazał się za silny. Zlecenie przepadło, a straconej energii nikt nie zwróci.', inline: false });
         }
+        if (monsterImg) finalEmbed.setImage(monsterImg);
+        finalEmbed.setFooter({ text: `Awanturniczość: ${fresh.stamina}/100  ·  Passa: ${newStreak}` });
 
-        resultEmbed.setFooter({
-            text: `Awanturniczość: ${fresh.stamina}/100  ·  Passa: ${newStreak}`
-        });
-
-        await choice.update({ embeds: [resultEmbed], components: [] });
+        await choice.deferUpdate();
+        await revealCombat(interaction, displayLines, makeFrame, finalEmbed);
     }
 };

@@ -17,6 +17,8 @@
 //   lifesteal - leczy sie czescia zadanych obrazen
 // Wagi (weights) rozkladaja "moc" potwora miedzy staty; ~1.3 to staty wiodaca.
 
+const { MONSTER_NAMES } = require('./monster_names');
+
 const LOCATIONS = {
     velen: {
         key: 'velen', name: 'Bagna Velen', emoji: '🌿',
@@ -82,6 +84,21 @@ const LOCATIONS = {
 
 const LOCATION_ORDER = ['velen', 'novigrad', 'skellige', 'kaer_morhen', 'toussaint'];
 
+// Tier nazw per lokacja: potwory normalne z 'normal', elity z 'elite' (wyzszy tier).
+// Nazwy sluza tylko za etykiete - statystyki wynikaja z archetypu i poziomu.
+const LOCATION_TIERS = {
+    velen:       { normal: 'common',    elite: 'uncommon' },
+    novigrad:    { normal: 'uncommon',  elite: 'rare' },
+    skellige:    { normal: 'rare',      elite: 'epic' },
+    kaer_morhen: { normal: 'epic',      elite: 'legendary' },
+    toussaint:   { normal: 'legendary', elite: 'mythic' }
+};
+
+function pickName(tier) {
+    const pool = MONSTER_NAMES[tier] || MONSTER_NAMES.common;
+    return pool[Math.floor(Math.random() * pool.length)];
+}
+
 // Globalne pokretla skalowania potworow (latwe do strojenia).
 const STAT_BASE = 6;
 const STAT_PER_LVL = 3.0;
@@ -89,7 +106,7 @@ const STAT_PER_LVL = 3.0;
 const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
 /** Buduje konkretnego potwora z archetypu na podany "efektywny" poziom. */
-function buildMonster(archetype, effLevel, isElite) {
+function buildMonster(archetype, effLevel, isElite, name) {
     // Elita zachowuje sie jak potwor o 2 poziomy wyzszy + premia do HP i nagrod.
     const lvl = Math.max(1, isElite ? effLevel + 2 : effLevel);
     const core = STAT_BASE + lvl * STAT_PER_LVL;
@@ -109,7 +126,7 @@ function buildMonster(archetype, effLevel, isElite) {
     const crownReward = Math.round((7 + effLevel * 4) * (isElite ? 2.2 : 1));
 
     return {
-        name: isElite ? `Elitarny ${archetype.name}` : archetype.name,
+        name: name || archetype.name,
         emoji: archetype.emoji,
         level: effLevel,
         isElite: !!isElite,
@@ -124,15 +141,18 @@ function buildMonster(archetype, effLevel, isElite) {
 }
 
 /** Losuje potwora odpowiedniego dla lokacji i poziomu gracza. */
-function getMonsterForLocation(locationKey, playerLevel) {
+function getMonsterForLocation(locationKey, playerLevel, forceElite = false) {
     const loc = LOCATIONS[locationKey];
     if (!loc) return null;
 
     const archetype = loc.pool[Math.floor(Math.random() * loc.pool.length)];
     const effLevel = Math.max(1, playerLevel + loc.levelOffset + randInt(-1, 1));
-    const isElite = Math.random() < 0.15;
+    const isElite = forceElite || Math.random() < 0.15;
 
-    return buildMonster(archetype, effLevel, isElite);
+    const tiers = LOCATION_TIERS[locationKey] || { normal: 'common', elite: 'uncommon' };
+    const name = pickName(isElite ? tiers.elite : tiers.normal);
+
+    return buildMonster(archetype, effLevel, isElite, name);
 }
 
 /** Lokacje dostepne dla danego poziomu gracza. */

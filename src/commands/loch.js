@@ -17,7 +17,9 @@ const {
 const { ITEMS } = require('../data/items');
 const { getEquippedMap, addItem } = require('../game/inventory');
 const { baseWithBought } = require('../game/training');
-const { baseEmbed, progressBar } = require('../utils/embeds');
+const { baseEmbed, progressBar, authorFor, outcomeColor } = require('../utils/embeds');
+const { imageForName } = require('../data/monster_images');
+const { revealCombat } = require('../utils/combat_anim');
 
 function formatLog(log, maxLines = 14) {
     if (log.length <= maxLines) return log.join('\n');
@@ -157,35 +159,48 @@ module.exports = {
             );
         }
 
-        const title = won ? (isFinal ? 'Lokacja ukończona!' : 'Etap pokonany') : 'Porażka';
-        const resultEmbed = baseEmbed(title)
-            .setDescription(`${loc.name} — ${stageLabel}\nPrzeciwnik: **${boss.name}** (poz. ${boss.level})\n\n${formatLog(result.log)}`);
+        // --- Oprawa: nagłówek, grafika potwora, animacja krok po kroku ---
+        const monsterImg = imageForName(boss.name);
+        const header = `**${boss.name}** — poziom ${boss.level}\n${loc.name} · ${stageLabel}`;
+        const logText = formatLog(result.log);
+        const displayLines = logText.split('\n');
+
+        const makeFrame = (visible) => {
+            const e = baseEmbed('Walka').setAuthor(authorFor(fresh))
+                .setDescription(`${header}\n\n${visible.join('\n')}`);
+            if (monsterImg) e.setImage(monsterImg);
+            return e;
+        };
+
+        const title = won ? (isFinal ? 'Lokacja ukończona' : 'Etap pokonany') : 'Porażka';
+        const finalEmbed = baseEmbed(title).setColor(outcomeColor(won)).setAuthor(authorFor(fresh))
+            .setDescription(header)
+            .addFields({ name: 'Przebieg walki', value: logText, inline: false });
 
         if (won) {
-            const nextStage = stage + 1;
             const expNeeded = expForNextLevel(fresh.level);
-            resultEmbed.addFields(
-                { name: 'Nagroda', value: `+${boss.expReward} exp · +${boss.crowns ?? boss.crownReward} koron`, inline: false },
+            finalEmbed.addFields(
+                { name: 'Nagroda', value: `+${boss.expReward} exp · +${boss.crownReward} koron`, inline: false },
                 { name: 'Postęp', value: `Poziom ${fresh.level} · ${fresh.exp}/${expNeeded} exp\n${progressBar(fresh.exp, expNeeded)}`, inline: false }
             );
             if (levelsGained.length > 0) {
-                resultEmbed.addFields({ name: 'Awans', value: `Osiągnięto **poziom ${fresh.level}**.`, inline: false });
+                finalEmbed.addFields({ name: 'Awans', value: `Osiągnięto poziom ${fresh.level}.`, inline: false });
             }
             if (drop) {
-                resultEmbed.addFields({ name: `Łup — ${RARITY[drop.rarity].name}`, value: formatItem(drop), inline: false });
+                finalEmbed.addFields({ name: `Łup — ${RARITY[drop.rarity].name}`, value: formatItem(drop), inline: false });
             }
             if (isFinal) {
-                resultEmbed.addFields({ name: 'Lokacja zaliczona', value: `Pokonałeś wszystkich bossów **${loc.name}**. Farm zdobywaj w karczmie i arenie.`, inline: false });
+                finalEmbed.addFields({ name: 'Lokacja zaliczona', value: `Pokonałeś wszystkich bossów **${loc.name}**. Farm zdobywaj w karczmie i arenie.`, inline: false });
             } else {
-                const next = getBoss(key, nextStage);
-                if (nextStage < STAGES_PER_LOCATION) {
-                    resultEmbed.setFooter({ text: `Następny: ${next.name} (poz. ${next.level})` });
-                }
+                const next = getBoss(key, stage + 1);
+                if (stage + 1 < STAGES_PER_LOCATION) finalEmbed.setFooter({ text: `Następny: ${next.name} (poz. ${next.level})` });
             }
         } else {
-            resultEmbed.addFields({ name: 'Skutek', value: 'Boss okazał się za silny. Rozwiń się i spróbuj ponownie.', inline: false });
+            finalEmbed.addFields({ name: 'Skutek', value: 'Boss okazał się za silny. Rozwiń się i spróbuj ponownie.', inline: false });
         }
+        if (monsterImg) finalEmbed.setImage(monsterImg);
 
-        await choice.update({ embeds: [resultEmbed], components: [] });
+        await choice.deferUpdate();
+        await revealCombat(interaction, displayLines, makeFrame, finalEmbed);
     }
 };

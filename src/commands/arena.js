@@ -9,7 +9,8 @@ const {
     ARENA_COOLDOWN, MIN_HONOR, honorDelta, cooldownLeft, buildCombatant, crownReward
 } = require('../game/arena');
 const { formatDuration } = require('../game/actionpoints');
-const { baseEmbed } = require('../utils/embeds');
+const { baseEmbed, authorFor, outcomeColor } = require('../utils/embeds');
+const { revealCombat } = require('../utils/combat_anim');
 
 function formatLog(log, maxLines = 12) {
     if (log.length <= maxLines) return log.join('\n');
@@ -138,23 +139,29 @@ module.exports = {
         const newRank = await rankOf(db, myNewHonor);
         const deltaTxt = delta >= 0 ? `+${delta}` : `${delta}`;
 
-        const resultEmbed = baseEmbed(won ? 'Zwycięstwo w arenie' : 'Porażka w arenie')
-            .setDescription(
-                `${schools[fresh.school].emoji} **${fresh.name}** vs ${schools[opp.school].emoji} **${opp.name}**\n\n${formatLog(result.log)}`
-            )
-            .addFields({
-                name: 'Punkty chwały',
-                value: `${fresh.honor} → **${myNewHonor}** (${deltaTxt})\nPozycja w rankingu: **#${newRank}**`,
-                inline: false
-            });
+        const header = `**${fresh.name}** vs **${opp.name}**\n${schools[fresh.school].name} przeciw ${schools[opp.school].name}`;
+        const logText = formatLog(result.log);
+        const displayLines = logText.split('\n');
+
+        const makeFrame = (visible) =>
+            baseEmbed('Pojedynek').setAuthor(authorFor(fresh)).setDescription(`${header}\n\n${visible.join('\n')}`);
+
+        const finalEmbed = baseEmbed(won ? 'Zwycięstwo w arenie' : 'Porażka w arenie')
+            .setColor(outcomeColor(won)).setAuthor(authorFor(fresh))
+            .setDescription(header)
+            .addFields(
+                { name: 'Przebieg walki', value: logText, inline: false },
+                { name: 'Punkty chwały', value: `${fresh.honor} → **${myNewHonor}** (${deltaTxt})\nPozycja w rankingu: **#${newRank}**`, inline: false }
+            );
 
         if (won) {
             let nagrody = `**+${gainedCrowns}** koron`;
             if (gainedEars > 0) nagrody += `\n**+1 Ucho**`;
-            resultEmbed.addFields({ name: 'Nagroda', value: nagrody, inline: false });
+            finalEmbed.addFields({ name: 'Nagroda', value: nagrody, inline: false });
         }
-        resultEmbed.setFooter({ text: `Następna walka za ${formatDuration(ARENA_COOLDOWN)}` });
+        finalEmbed.setFooter({ text: `Następna walka za ${formatDuration(ARENA_COOLDOWN)}` });
 
-        await choice.update({ embeds: [resultEmbed], components: [] });
+        await choice.deferUpdate();
+        await revealCombat(interaction, displayLines, makeFrame, finalEmbed);
     }
 };

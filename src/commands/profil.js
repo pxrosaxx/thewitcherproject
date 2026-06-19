@@ -5,7 +5,7 @@ const { expForNextLevel, calculateMaxHp } = require('../game/character');
 const { refreshActionPoints, formatDuration } = require('../game/actionpoints');
 const { getEquipmentBonus } = require('../game/inventory');
 const { baseWithBought } = require('../game/training');
-const { baseEmbed, progressBar } = require('../utils/embeds');
+const { baseEmbed, progressBar, authorFor } = require('../utils/embeds');
 
 module.exports = {
     data: new SlashCommandBuilder().setName('profil').setDescription('Pokazuje kartę Twojej postaci.'),
@@ -53,8 +53,9 @@ module.exports = {
         const stamina = player.last_stamina_reset === today ? player.stamina : 100;
         const maxStamina = 100;
 
-        const embed = baseEmbed(`${school.emoji} ${player.name}`)
-            .setDescription(`${school.name} — *${school.title}*`)
+        const embed = baseEmbed('Karta postaci')
+            .setAuthor(authorFor(player))
+            .setDescription(`*${school.title}*`)
             .addFields(
                 { name: 'Poziom', value: `${player.level}`, inline: true },
                 { name: 'Doświadczenie', value: `${player.exp} / ${expNeeded}\n${progressBar(player.exp, expNeeded)}`, inline: true },

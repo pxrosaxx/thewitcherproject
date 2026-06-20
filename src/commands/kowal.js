@@ -6,6 +6,8 @@ const getDbConnection = require('../db');
 const { RARITY, generateItemStats, statsLine, formatItem } = require('../game/equipment');
 const { getBackpack, getEquippedMap, getItem, setItemStats } = require('../game/inventory');
 const { baseEmbed } = require('../utils/embeds');
+const { incStat } = require('../game/player_stats');
+const { checkAchievements, achievementsField } = require('../data/achievements');
 
 // Koszt ulepszenia poziomu (korony) i przekucia rzadkosci (korony + Uszy).
 const USZY_COST = { 2: 2, 3: 3, 4: 5, 5: 8 };
@@ -139,8 +141,11 @@ module.exports = {
             await db.run('UPDATE players SET crowns = crowns - ? WHERE discord_id = ?', cost, interaction.user.id);
 
             const updated = await getItem(db, interaction.user.id, rowId);
+            await incStat(db, interaction.user.id, 'items_upgraded', 1);
             const embed = baseEmbed('Ulepszono poziom')
                 .setDescription(`${formatItem(updated)}\n\nPoziom ${freshItem.itemLevel} → **${newLevel}**\nStaty: ${before}  →  **${statsLine(updated.stats)}**\nKoszt: ${cost} koron · pozostało ${freshP.crowns - cost}.`);
+            const af1 = achievementsField(await checkAchievements(db, interaction.user.id));
+            if (af1) embed.addFields(af1);
             return act.update({ embeds: [embed], components: [] });
         }
 
@@ -155,8 +160,11 @@ module.exports = {
         await db.run('UPDATE players SET crowns = crowns - ?, ears = ears - ? WHERE discord_id = ?', rc.crowns, rc.ears, interaction.user.id);
 
         const updated = await getItem(db, interaction.user.id, rowId);
+        await incStat(db, interaction.user.id, 'items_upgraded', 1);
         const embed = baseEmbed('Przekuto rzadkość')
             .setDescription(`${formatItem(updated)}\n\n${RARITY[freshItem.rarity].name} → **${RARITY[newRarity].name}**\nStaty: ${before}  →  **${statsLine(updated.stats)}**\nKoszt: ${rc.crowns} koron + ${rc.ears} Uszy.`);
+        const af2 = achievementsField(await checkAchievements(db, interaction.user.id));
+        if (af2) embed.addFields(af2);
         return act.update({ embeds: [embed], components: [] });
     }
 };

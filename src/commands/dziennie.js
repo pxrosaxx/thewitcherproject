@@ -4,6 +4,7 @@ const { RARITY, makeItemInstance, formatItem } = require('../game/equipment');
 const { ITEMS } = require('../data/items');
 const { addItem } = require('../game/inventory');
 const { baseEmbed } = require('../utils/embeds');
+const { checkAchievements, achievementsField } = require('../data/achievements');
 
 const dayStr = (ms) => new Date(ms).toISOString().split('T')[0];
 
@@ -63,6 +64,8 @@ module.exports = {
         }
         embed.setFooter({ text: 'Wróć jutro, by nie stracić passy.' });
 
+        const af = achievementsField(await checkAchievements(db, interaction.user.id));
+        if (af) embed.addFields(af);
         await interaction.reply({ embeds: [embed] });
     }
 };

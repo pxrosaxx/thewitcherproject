@@ -18,6 +18,10 @@ const { baseWithBought } = require('../game/training');
 const { buildQuestText } = require('../data/questtext');
 const { imageForName } = require('../data/monster_images');
 const { revealCombat } = require('../utils/combat_anim');
+const { applyLoadout } = require('../data/alchemy');
+const { incStat } = require('../game/player_stats');
+const { checkAchievements, achievementsField } = require('../data/achievements');
+const { getBonuses } = require('../data/guilds');
 
 // --- AUTOMATYCZNA MIGRACJA BAZY ---
 // Ten fragment upewnia się, że w bazie są kolumny na Energię i Uszy, bez kasowania Twoich postaci.
@@ -170,11 +174,19 @@ module.exports = {
         const equippedArr = SLOT_ORDER.map((sl) => equippedMap[sl]).filter(Boolean);
         const baseStats = baseWithBought(fresh);
         const eff = effectiveStats(baseStats, equippedArr, fresh.school);
-        const combatPlayer = { ...fresh, ...eff, max_hp: calculateMaxHp(eff, fresh.level) };
+        const guildBon = await getBonuses(db, interaction.user.id);
+        const tMult = guildBon ? guildBon.treasureMult : 1;
+        const academyMult = guildBon ? guildBon.academyMult : 1;
+        const effB = {
+            str: Math.round(eff.str * tMult), dex: Math.round(eff.dex * tMult), intel: Math.round(eff.intel * tMult),
+            wit: Math.round(eff.wit * tMult), luck: Math.round(eff.luck * tMult)
+        };
+        const combatPlayer = { ...fresh, ...effB, max_hp: calculateMaxHp(effB, fresh.level) };
 
         // Silnik walki
         const pc = combatantFromPlayer(combatPlayer, school);
         const mc = combatantFromMonster(quest.monster);
+        const usedConsumables = await applyLoadout(db, fresh, pc, mc);
         const result = simulateCombat(pc, mc);
         const won = result.winner === 'player';
 
@@ -185,7 +197,7 @@ module.exports = {
         let drop = null;
 
         if (won) {
-            gainedExp = quest.expReward;
+            gainedExp = Math.round(quest.expReward * academyMult);
             gainedCrowns = quest.crownReward;
             newStreak += 1;
 
@@ -225,6 +237,12 @@ module.exports = {
             fresh.hp, fresh.max_hp, fresh.win_streak, fresh.stamina, fresh.last_stamina_reset, (fresh.ears || 0), interaction.user.id
         );
 
+        if (won) {
+            await incStat(db, interaction.user.id, 'monsters_defeated', 1);
+            await incStat(db, interaction.user.id, 'contracts_done', 1);
+        }
+        const newAch = won ? await checkAchievements(db, interaction.user.id) : [];
+
         // --- EKRAN WYNIKOWY (z animacją krok po kroku) ---
         const monsterImg = imageForName(quest.monster.name);
         const header = `*${quest.story}*\n\n**${quest.monster.name}** — poziom ${quest.monster.level} · ${quest.loc.name}`;
@@ -242,6 +260,9 @@ module.exports = {
             .setColor(outcomeColor(won)).setAuthor(authorFor(fresh))
             .setDescription(header)
             .addFields({ name: 'Przebieg walki', value: logText, inline: false });
+        if (usedConsumables.length > 0) {
+            finalEmbed.addFields({ name: 'Alchemia', value: usedConsumables.join(', '), inline: false });
+        }
 
         if (won) {
             const expNeeded = expForNextLevel(fresh.level);
@@ -262,6 +283,8 @@ module.exports = {
         } else {
             finalEmbed.addFields({ name: 'Skutek', value: 'Potwór okazał się za silny. Zlecenie przepadło, a straconej energii nikt nie zwróci.', inline: false });
         }
+        const af = achievementsField(newAch);
+        if (af) finalEmbed.addFields(af);
         if (monsterImg) finalEmbed.setImage(monsterImg);
         finalEmbed.setFooter({ text: `Awanturniczość: ${fresh.stamina}/100  ·  Passa: ${newStreak}` });
 

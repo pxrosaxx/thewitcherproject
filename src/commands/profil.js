@@ -6,13 +6,14 @@ const { refreshActionPoints, formatDuration } = require('../game/actionpoints');
 const { getEquipmentBonus } = require('../game/inventory');
 const { baseWithBought } = require('../game/training');
 const { baseEmbed, progressBar, authorFor } = require('../utils/embeds');
+const { checkAchievements, getEarnedIds, ACHIEVEMENTS } = require('../data/achievements');
 
 module.exports = {
     data: new SlashCommandBuilder().setName('profil').setDescription('Pokazuje kartę Twojej postaci.'),
 
     async execute(interaction) {
         const db = await getDbConnection();
-        const player = await db.get('SELECT * FROM players WHERE discord_id = ?', interaction.user.id);
+        let player = await db.get('SELECT * FROM players WHERE discord_id = ?', interaction.user.id);
 
         if (!player) {
             return interaction.reply({
@@ -28,6 +29,12 @@ module.exports = {
         }
 
         const school = schools[player.school];
+
+        // Nadgonienie osiągnięć (gdyby coś przekroczyło próg gdzie indziej).
+        await checkAchievements(db, interaction.user.id);
+        player = await db.get('SELECT * FROM players WHERE discord_id = ?', interaction.user.id);
+        const earnedCount = (await getEarnedIds(db, interaction.user.id)).size;
+
         const expNeeded = expForNextLevel(player.level);
         const ap = await refreshActionPoints(db, player);
         const bonus = await getEquipmentBonus(db, interaction.user.id, player.school);
@@ -55,7 +62,7 @@ module.exports = {
 
         const embed = baseEmbed('Karta postaci')
             .setAuthor(authorFor(player))
-            .setDescription(`*${school.title}*`)
+            .setDescription(player.title ? `⚜ *${player.title}*` : `*${school.title}*`)
             .addFields(
                 { name: 'Poziom', value: `${player.level}`, inline: true },
                 { name: 'Doświadczenie', value: `${player.exp} / ${expNeeded}\n${progressBar(player.exp, expNeeded)}`, inline: true },
@@ -70,10 +77,11 @@ module.exports = {
                 { name: 'Inteligencja', value: fmt('intel'), inline: true },
                 { name: 'Witalność', value: fmt('wit'), inline: true },
                 { name: 'Szczęście', value: fmt('luck'), inline: true },
+                { name: 'Osiągnięcia', value: `${earnedCount}/${ACHIEVEMENTS.length}`, inline: true },
                 { name: 'Passa zwycięstw', value: `${player.win_streak || 0}`, inline: true },
                 { name: 'Passa logowań', value: `${player.daily_streak || 0} dni`, inline: true }
             )
-            .setFooter({ text: 'Bonus w nawiasie = trening + ekwipunek' });
+            .setFooter({ text: 'Tytuł zmienisz w /osiagniecia · bonus w nawiasie = trening + ekwipunek' });
 
         await interaction.reply({ embeds: [embed] });
     }

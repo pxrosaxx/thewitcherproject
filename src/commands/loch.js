@@ -1,13 +1,11 @@
 const {
-    SlashCommandBuilder, ActionRowBuilder, ButtonBuilder,
-    ButtonStyle, ComponentType, MessageFlags
+    SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder,
+    ComponentType, MessageFlags
 } = require('discord.js');
 const getDbConnection = require('../db');
 const schools = require('../data/schools');
-const { LOCATIONS, LOCATION_ORDER } = require('../data/monsters');
-const {
-    getBoss, getAllProgress, getProgress, setProgress, STAGES_PER_LOCATION, FINAL_STAGE_INDEX
-} = require('../data/dungeons');
+const { getProgress, getAllProgress, setProgress } = require('../data/dungeons');
+const { listDungeons, getBossFor } = require('../data/dungeon_registry');
 const { combatantFromPlayer, combatantFromMonster, simulateCombat } = require('../game/combat');
 const { calculateMaxHp, expForNextLevel, levelUpFromExp } = require('../game/character');
 const { refreshActionPoints, spendActionPoint, formatDuration } = require('../game/actionpoints');
@@ -20,6 +18,10 @@ const { baseWithBought } = require('../game/training');
 const { baseEmbed, progressBar, authorFor, outcomeColor } = require('../utils/embeds');
 const { imageForName } = require('../data/monster_images');
 const { revealCombat } = require('../utils/combat_anim');
+const { applyLoadout } = require('../data/alchemy');
+const { incStat } = require('../game/player_stats');
+const { checkAchievements, achievementsField } = require('../data/achievements');
+const { getBonuses } = require('../data/guilds');
 
 function formatLog(log, maxLines = 14) {
     if (log.length <= maxLines) return log.join('\n');
@@ -27,8 +29,8 @@ function formatLog(log, maxLines = 14) {
 }
 
 /** Gwarantowany przedmiot z finałowego bossa (dobra rzadkość). */
-function bossDrop(loc, level) {
-    const rarity = Math.max(3, rollRarity(loc.levelOffset, true));
+function bossDrop(levelOffset, level) {
+    const rarity = Math.max(3, rollRarity(levelOffset, true));
     let pool = ITEMS.filter((i) => i.rarity === rarity);
     if (!pool.length) pool = ITEMS.filter((i) => i.rarity <= rarity && i.rarity >= 3);
     if (!pool.length) pool = ITEMS.filter((i) => i.rarity === 3);
@@ -48,43 +50,39 @@ module.exports = {
 
         const ap = await refreshActionPoints(db, player);
         const progress = await getAllProgress(db, interaction.user.id);
+        const all = await listDungeons(db);
 
-        const embed = baseEmbed('Lochy')
+        const embed = baseEmbed('Lochy').setAuthor(authorFor(player))
             .setDescription(
-                `**${player.name}** — punkty akcji: **${ap.points}/${ap.max}**` +
+                `Punkty akcji: **${ap.points}/${ap.max}**` +
                 (ap.points < ap.max ? `  (następny za ${formatDuration(ap.secondsToNext)})` : '')
             );
 
-        const row = new ActionRowBuilder();
-        let anyPlayable = false;
-
-        for (const key of LOCATION_ORDER) {
-            const loc = LOCATIONS[key];
-            const stage = progress[key] || 0;
-            const locked = player.level < loc.minLevel;
-            const done = stage >= STAGES_PER_LOCATION;
+        const options = [];
+        for (const d of all) {
+            const stage = progress[d.key] || 0;
+            const locked = player.level < d.minLevel;
+            const done = stage >= d.stageCount;
 
             let status;
             if (locked) {
-                status = `_Zablokowane — wymaga ${loc.minLevel} poz._`;
+                status = `_Zablokowane — wymaga ${d.minLevel} poz._`;
             } else if (done) {
                 status = '**Ukończono** ✓';
             } else {
-                const next = getBoss(key, stage);
-                const label = stage === FINAL_STAGE_INDEX ? 'Finałowy boss' : `Etap ${stage + 1}/${STAGES_PER_LOCATION}`;
+                const next = await getBossFor(db, d, stage);
+                const isFinal = stage === d.stageCount - 1;
+                const label = isFinal ? 'Finałowy boss' : `Etap ${stage + 1}/${d.stageCount}`;
                 status = `${label} — następny: **${next.name}** (poz. ${next.level})`;
             }
-            embed.addFields({ name: `${loc.name}`, value: status, inline: false });
+            embed.addFields({ name: d.isCustom ? `${d.name} (własny)` : d.name, value: status, inline: false });
 
             if (!locked && !done) {
-                anyPlayable = true;
-                row.addComponents(
-                    new ButtonBuilder()
-                        .setCustomId(`loch_${key}`)
-                        .setLabel(loc.name)
-                        .setStyle(stage === FINAL_STAGE_INDEX ? ButtonStyle.Danger : ButtonStyle.Primary)
-                        .setDisabled(ap.points <= 0)
-                );
+                options.push({
+                    label: `${d.name}`.slice(0, 100),
+                    description: `${stage === d.stageCount - 1 ? 'Finałowy boss' : `Etap ${stage + 1}/${d.stageCount}`}`.slice(0, 100),
+                    value: d.key
+                });
             }
         }
 
@@ -92,16 +90,21 @@ module.exports = {
             embed.setFooter({ text: `Brak punktów akcji — wróć za ${formatDuration(ap.secondsToNext)}` });
         }
 
-        const components = anyPlayable ? [row] : [];
+        const canPlay = options.length > 0 && ap.points > 0;
+        const components = canPlay
+            ? [new ActionRowBuilder().addComponents(
+                new StringSelectMenuBuilder().setCustomId('loch_pick').setPlaceholder('Wybierz loch').addOptions(options.slice(0, 25)))]
+            : [];
+
         await interaction.reply({ embeds: [embed], components });
-        if (!anyPlayable || ap.points <= 0) return;
+        if (!canPlay) return;
 
         const message = await interaction.fetchReply();
         let choice;
         try {
             choice = await message.awaitMessageComponent({
-                filter: (i) => i.user.id === interaction.user.id && i.customId.startsWith('loch_'),
-                componentType: ComponentType.Button, time: 60000
+                filter: (i) => i.user.id === interaction.user.id && i.customId === 'loch_pick',
+                componentType: ComponentType.StringSelect, time: 60000
             });
         } catch {
             await interaction.editReply({ components: [] }).catch(() => {});
@@ -114,29 +117,41 @@ module.exports = {
             return choice.update({ embeds: [baseEmbed('Lochy').setDescription('Nie masz już punktów akcji.')], components: [] });
         }
 
-        const key = choice.customId.replace('loch_', '');
-        const loc = LOCATIONS[key];
+        const key = choice.values[0];
+        const entry = (await listDungeons(db)).find((d) => d.key === key);
+        if (!entry) {
+            return choice.update({ embeds: [baseEmbed('Lochy').setDescription('Ten loch już nie istnieje.')], components: [] });
+        }
         const stage = await getProgress(db, interaction.user.id, key);
-        if (stage >= STAGES_PER_LOCATION) {
-            return choice.update({ embeds: [baseEmbed('Lochy').setDescription('Ta lokacja jest już ukończona.')], components: [] });
+        if (stage >= entry.stageCount) {
+            return choice.update({ embeds: [baseEmbed('Lochy').setDescription('Ten loch jest już ukończony.')], components: [] });
         }
 
         await spendActionPoint(db, fresh);
 
-        const boss = getBoss(key, stage);
+        const boss = await getBossFor(db, entry, stage);
         const school = schools[fresh.school];
 
-        // Efektywne staty = poziom + trening + ekwipunek
         const equippedMap = await getEquippedMap(db, interaction.user.id);
         const equippedArr = SLOT_ORDER.map((sl) => equippedMap[sl]).filter(Boolean);
         const eff = effectiveStats(baseWithBought(fresh), equippedArr, fresh.school);
-        const combatPlayer = { ...fresh, ...eff, max_hp: calculateMaxHp(eff, fresh.level) };
+        const guildBon = await getBonuses(db, interaction.user.id);
+        const tMult = guildBon ? guildBon.treasureMult : 1;
+        const academyMult = guildBon ? guildBon.academyMult : 1;
+        const effB = {
+            str: Math.round(eff.str * tMult), dex: Math.round(eff.dex * tMult), intel: Math.round(eff.intel * tMult),
+            wit: Math.round(eff.wit * tMult), luck: Math.round(eff.luck * tMult)
+        };
+        const combatPlayer = { ...fresh, ...effB, max_hp: calculateMaxHp(effB, fresh.level) };
 
-        const result = simulateCombat(combatantFromPlayer(combatPlayer, school), combatantFromMonster(boss));
+        const pc = combatantFromPlayer(combatPlayer, school);
+        const mc = combatantFromMonster(boss);
+        const usedConsumables = await applyLoadout(db, fresh, pc, mc);
+        const result = simulateCombat(pc, mc);
         const won = result.winner === 'player';
 
-        const isFinal = stage === FINAL_STAGE_INDEX;
-        const stageLabel = isFinal ? 'Finałowy boss' : `Etap ${stage + 1}/${STAGES_PER_LOCATION}`;
+        const isFinal = stage === entry.stageCount - 1;
+        const stageLabel = isFinal ? 'Finałowy boss' : `Etap ${stage + 1}/${entry.stageCount}`;
 
         let drop = null;
         const levelsGained = [];
@@ -144,12 +159,11 @@ module.exports = {
         if (won) {
             await setProgress(db, interaction.user.id, key, stage + 1);
 
-            fresh.exp += boss.expReward;
+            fresh.exp += Math.round(boss.expReward * academyMult);
             fresh.crowns += boss.crownReward;
             levelsGained.push(...levelUpFromExp(fresh, school));
 
-            // Łup: finałowy boss gwarantuje przedmiot, mini-boss ma szansę.
-            drop = isFinal ? bossDrop(loc, boss.level) : rollDrop(boss.level, loc.levelOffset, false);
+            drop = isFinal ? bossDrop(entry.levelOffset, boss.level) : rollDrop(boss.level, entry.levelOffset, false);
             if (drop) await addItem(db, interaction.user.id, drop);
 
             fresh.hp = fresh.max_hp;
@@ -157,11 +171,17 @@ module.exports = {
                 `UPDATE players SET exp = ?, crowns = ?, level = ?, str = ?, dex = ?, intel = ?, wit = ?, luck = ?, hp = ?, max_hp = ? WHERE discord_id = ?`,
                 fresh.exp, fresh.crowns, fresh.level, fresh.str, fresh.dex, fresh.intel, fresh.wit, fresh.luck, fresh.hp, fresh.max_hp, interaction.user.id
             );
+
+            await incStat(db, interaction.user.id, 'monsters_defeated', 1);
+            await incStat(db, interaction.user.id, 'bosses_defeated', 1);
+            if (isFinal) await incStat(db, interaction.user.id, 'locations_completed', 1);
         }
 
+        const newAch = won ? await checkAchievements(db, interaction.user.id) : [];
+
         // --- Oprawa: nagłówek, grafika potwora, animacja krok po kroku ---
-        const monsterImg = imageForName(boss.name);
-        const header = `**${boss.name}** — poziom ${boss.level}\n${loc.name} · ${stageLabel}`;
+        const monsterImg = boss.imageUrl || imageForName(boss.name);
+        const header = `**${boss.name}** — poziom ${boss.level}\n${entry.name} · ${stageLabel}`;
         const logText = formatLog(result.log);
         const displayLines = logText.split('\n');
 
@@ -172,10 +192,13 @@ module.exports = {
             return e;
         };
 
-        const title = won ? (isFinal ? 'Lokacja ukończona' : 'Etap pokonany') : 'Porażka';
+        const title = won ? (isFinal ? 'Lochy ukończone' : 'Etap pokonany') : 'Porażka';
         const finalEmbed = baseEmbed(title).setColor(outcomeColor(won)).setAuthor(authorFor(fresh))
             .setDescription(header)
             .addFields({ name: 'Przebieg walki', value: logText, inline: false });
+        if (usedConsumables.length > 0) {
+            finalEmbed.addFields({ name: 'Alchemia', value: usedConsumables.join(', '), inline: false });
+        }
 
         if (won) {
             const expNeeded = expForNextLevel(fresh.level);
@@ -190,14 +213,16 @@ module.exports = {
                 finalEmbed.addFields({ name: `Łup — ${RARITY[drop.rarity].name}`, value: formatItem(drop), inline: false });
             }
             if (isFinal) {
-                finalEmbed.addFields({ name: 'Lokacja zaliczona', value: `Pokonałeś wszystkich bossów **${loc.name}**. Farm zdobywaj w karczmie i arenie.`, inline: false });
+                finalEmbed.addFields({ name: 'Loch zaliczony', value: `Pokonałeś wszystkich bossów: **${entry.name}**.`, inline: false });
             } else {
-                const next = getBoss(key, stage + 1);
-                if (stage + 1 < STAGES_PER_LOCATION) finalEmbed.setFooter({ text: `Następny: ${next.name} (poz. ${next.level})` });
+                const next = await getBossFor(db, entry, stage + 1);
+                if (next) finalEmbed.setFooter({ text: `Następny: ${next.name} (poz. ${next.level})` });
             }
         } else {
             finalEmbed.addFields({ name: 'Skutek', value: 'Boss okazał się za silny. Rozwiń się i spróbuj ponownie.', inline: false });
         }
+        const af = achievementsField(newAch);
+        if (af) finalEmbed.addFields(af);
         if (monsterImg) finalEmbed.setImage(monsterImg);
 
         await choice.deferUpdate();

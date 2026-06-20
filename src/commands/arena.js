@@ -11,6 +11,8 @@ const {
 const { formatDuration } = require('../game/actionpoints');
 const { baseEmbed, authorFor, outcomeColor } = require('../utils/embeds');
 const { revealCombat } = require('../utils/combat_anim');
+const { checkAchievements, achievementsField } = require('../data/achievements');
+const { getBonuses } = require('../data/guilds');
 
 function formatLog(log, maxLines = 12) {
     if (log.length <= maxLines) return log.join('\n');
@@ -108,6 +110,16 @@ module.exports = {
         // Walka na pelnych efektywnych statach
         const pcMe = await buildCombatant(db, fresh);
         const pcOpp = await buildCombatant(db, opp);
+        // Bonus skarbca gildii — symetrycznie dla obu (każdy z własnej gildii).
+        const applyTreasure = (c, mult) => {
+            if (!mult || mult === 1) return;
+            for (const k of ['str', 'dex', 'intel', 'wit', 'luck']) c.stats[k] = Math.round(c.stats[k] * mult);
+            c.maxHp = Math.round(c.maxHp * mult); c.hp = c.maxHp;
+        };
+        const myBon = await getBonuses(db, fresh.discord_id);
+        const oppBon = await getBonuses(db, opp.discord_id);
+        applyTreasure(pcMe, myBon ? myBon.treasureMult : 1);
+        applyTreasure(pcOpp, oppBon ? oppBon.treasureMult : 1);
         const result = simulateCombat(pcMe, pcOpp);
         const won = result.winner === 'player';
 
@@ -138,6 +150,7 @@ module.exports = {
 
         const newRank = await rankOf(db, myNewHonor);
         const deltaTxt = delta >= 0 ? `+${delta}` : `${delta}`;
+        const newAch = await checkAchievements(db, interaction.user.id);
 
         const header = `**${fresh.name}** vs **${opp.name}**\n${schools[fresh.school].name} przeciw ${schools[opp.school].name}`;
         const logText = formatLog(result.log);
@@ -159,6 +172,8 @@ module.exports = {
             if (gainedEars > 0) nagrody += `\n**+1 Ucho**`;
             finalEmbed.addFields({ name: 'Nagroda', value: nagrody, inline: false });
         }
+        const af = achievementsField(newAch);
+        if (af) finalEmbed.addFields(af);
         finalEmbed.setFooter({ text: `Następna walka za ${formatDuration(ARENA_COOLDOWN)}` });
 
         await choice.deferUpdate();

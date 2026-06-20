@@ -70,13 +70,14 @@ const STAGES = {
 const STAGES_PER_LOCATION = 6;
 const FINAL_STAGE_INDEX = STAGES_PER_LOCATION - 1;
 
-/** Buduje bossa danego etapu dla lokacji. stageIndex: 0..5 (5 = finałowy). */
-function getBoss(locationKey, stageIndex) {
-    const loc = LOCATIONS[locationKey];
-    const def = STAGES[locationKey][stageIndex];
-    const isFinal = stageIndex === FINAL_STAGE_INDEX;
+/**
+ * Wspólny builder bossa etapu — używany przez wbudowane I własne lochy.
+ * def: { name, kind, offense, weaponMult, hpMult, traits, imageUrl? }
+ */
+function buildStageBoss(def, minLevel, stageIndex, stageCount) {
+    const isFinal = stageIndex === stageCount - 1;
 
-    const nominalLevel = loc.minLevel + stageIndex;
+    const nominalLevel = minLevel + stageIndex;
     // Skalowanie przez przesuniecie poziomu. Mini-boss na poziomie etapu, finalowy +1.
     const statLevel = nominalLevel + (isFinal ? 1 : 0);
     const core = STAT_BASE + statLevel * STAT_PER_LVL;
@@ -97,19 +98,27 @@ function getBoss(locationKey, stageIndex) {
 
     return {
         name: def.name,
-        emoji: '', // bossy bez emotek - czysty styl
+        emoji: '',
         level: nominalLevel,
         isElite: isFinal,
         isFinal,
         stageIndex,
         offense: def.offense,
         weaponMult: weaponMult,
-        traits: def.traits.filter((t) => t !== 'armored'),
+        traits: (def.traits || []).filter((t) => t !== 'armored'),
         str: stats.str, dex: stats.dex, intel: stats.intel, wit: stats.wit, luck: stats.luck,
         maxHp,
         expReward,
-        crownReward
+        crownReward,
+        imageUrl: def.imageUrl || null
     };
+}
+
+/** Buduje bossa danego etapu dla WBUDOWANEJ lokacji. stageIndex: 0..5 (5 = finałowy). */
+function getBoss(locationKey, stageIndex) {
+    const loc = LOCATIONS[locationKey];
+    const def = STAGES[locationKey][stageIndex];
+    return buildStageBoss(def, loc.minLevel, stageIndex, STAGES_PER_LOCATION);
 }
 
 // --- Postep gracza w lochach (baza danych) -------------------------------
@@ -142,5 +151,5 @@ async function setProgress(db, discordId, locationKey, stage) {
 
 module.exports = {
     STAGES, STAGES_PER_LOCATION, FINAL_STAGE_INDEX,
-    getBoss, getProgress, getAllProgress, setProgress
+    getBoss, buildStageBoss, getProgress, getAllProgress, setProgress
 };

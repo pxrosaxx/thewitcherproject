@@ -51,7 +51,15 @@ const MIGRATIONS = [
     "ALTER TABLE players ADD COLUMN arena_losses INTEGER DEFAULT 0",
     "ALTER TABLE players ADD COLUMN last_arena_fight INTEGER DEFAULT 0",
     "ALTER TABLE players ADD COLUMN daily_streak INTEGER DEFAULT 0",
-    "ALTER TABLE players ADD COLUMN last_daily TEXT DEFAULT ''"
+    "ALTER TABLE players ADD COLUMN last_daily TEXT DEFAULT ''",
+    "ALTER TABLE players ADD COLUMN prep_eliksir TEXT DEFAULT ''",
+    "ALTER TABLE players ADD COLUMN prep_olej TEXT DEFAULT ''",
+    "ALTER TABLE players ADD COLUMN prep_bomba TEXT DEFAULT ''",
+    "ALTER TABLE players ADD COLUMN title TEXT DEFAULT ''",
+    "ALTER TABLE guilds ADD COLUMN war_wins INTEGER DEFAULT 0",
+    "ALTER TABLE guilds ADD COLUMN war_losses INTEGER DEFAULT 0",
+    "ALTER TABLE guilds ADD COLUMN guild_honor INTEGER DEFAULT 1000",
+    "ALTER TABLE guilds ADD COLUMN last_war INTEGER DEFAULT 0"
 ];
 
 
@@ -88,6 +96,89 @@ const CREATE_DUNGEON_PROGRESS = `
     )
 `;
 
+
+// Wlasne lochy adminow (Etap 11).
+const CREATE_CUSTOM_DUNGEONS = `
+    CREATE TABLE IF NOT EXISTS custom_dungeons (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        min_level INTEGER DEFAULT 1,
+        created_by TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+`;
+const CREATE_CUSTOM_MONSTERS = `
+    CREATE TABLE IF NOT EXISTS custom_monsters (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        dungeon_id INTEGER NOT NULL,
+        stage_index INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        archetype TEXT NOT NULL,
+        image_url TEXT
+    )
+`;
+
+// Zapas mikstur gracza (Etap 12).
+const CREATE_PLAYER_CONSUMABLES = `
+    CREATE TABLE IF NOT EXISTS player_consumables (
+        discord_id TEXT NOT NULL,
+        consumable_id TEXT NOT NULL,
+        qty INTEGER DEFAULT 0,
+        PRIMARY KEY (discord_id, consumable_id)
+    )
+`;
+
+// Liczniki statystyk gracza (Etap 13) — zasilają osiągnięcia.
+const CREATE_PLAYER_STATS = `
+    CREATE TABLE IF NOT EXISTS player_stats (
+        discord_id TEXT NOT NULL,
+        stat_key TEXT NOT NULL,
+        value INTEGER DEFAULT 0,
+        PRIMARY KEY (discord_id, stat_key)
+    )
+`;
+
+// Zdobyte osiągnięcia (Etap 13) — trwałe.
+const CREATE_PLAYER_ACHIEVEMENTS = `
+    CREATE TABLE IF NOT EXISTS player_achievements (
+        discord_id TEXT NOT NULL,
+        achievement_id TEXT NOT NULL,
+        earned_at INTEGER DEFAULT 0,
+        PRIMARY KEY (discord_id, achievement_id)
+    )
+`;
+
+// Gildie (Etap 15) — model SFGame: skarbiec, akademia, portal.
+const CREATE_GUILDS = `
+    CREATE TABLE IF NOT EXISTS guilds (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        leader_id TEXT NOT NULL,
+        treasury INTEGER DEFAULT 0,
+        treasure_level INTEGER DEFAULT 0,
+        academy_level INTEGER DEFAULT 0,
+        portal_stage INTEGER DEFAULT 1,
+        portal_hp INTEGER DEFAULT 0,
+        portal_max_hp INTEGER DEFAULT 0,
+        war_wins INTEGER DEFAULT 0,
+        war_losses INTEGER DEFAULT 0,
+        guild_honor INTEGER DEFAULT 1000,
+        last_war INTEGER DEFAULT 0,
+        created_at INTEGER DEFAULT 0
+    )
+`;
+
+const CREATE_GUILD_MEMBERS = `
+    CREATE TABLE IF NOT EXISTS guild_members (
+        discord_id TEXT PRIMARY KEY,
+        guild_id INTEGER NOT NULL,
+        role TEXT DEFAULT 'member',
+        donated INTEGER DEFAULT 0,
+        last_portal_attack TEXT DEFAULT '',
+        joined_at INTEGER DEFAULT 0
+    )
+`;
+
 async function createDatabase() {
     try {
         console.log('Przygotowuję bazę SQLite (Etap 2: lochy + punkty akcji)...');
@@ -101,6 +192,27 @@ async function createDatabase() {
 
         await db.exec(CREATE_DUNGEON_PROGRESS);
         console.log('✅ Tabela "dungeon_progress" gotowa.');
+
+        await db.exec(CREATE_CUSTOM_DUNGEONS);
+        console.log('✅ Tabela "custom_dungeons" gotowa.');
+
+        await db.exec(CREATE_CUSTOM_MONSTERS);
+        console.log('✅ Tabela "custom_monsters" gotowa.');
+
+        await db.exec(CREATE_PLAYER_CONSUMABLES);
+        console.log('✅ Tabela "player_consumables" gotowa.');
+
+        await db.exec(CREATE_PLAYER_STATS);
+        console.log('✅ Tabela "player_stats" gotowa.');
+
+        await db.exec(CREATE_PLAYER_ACHIEVEMENTS);
+        console.log('✅ Tabela "player_achievements" gotowa.');
+
+        await db.exec(CREATE_GUILDS);
+        console.log('✅ Tabela "guilds" gotowa.');
+
+        await db.exec(CREATE_GUILD_MEMBERS);
+        console.log('✅ Tabela "guild_members" gotowa.');
 
         // Migracje: dodaj brakujace kolumny. Jesli juz istnieja, SQLite rzuci blad
         // "duplicate column name" - ignorujemy go, to znaczy ze kolumna juz jest.

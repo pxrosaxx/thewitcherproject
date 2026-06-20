@@ -9,6 +9,8 @@ const {
 } = require('../game/equipment');
 const { getBackpack, getEquippedMap, equipItem } = require('../game/inventory');
 const { baseEmbed } = require('../utils/embeds');
+const { setStatMax } = require('../game/player_stats');
+const { checkAchievements, achievementsField } = require('../data/achievements');
 
 const STAT_NAMES = { str: 'SIŁ', dex: 'ZRĘ', intel: 'INT', wit: 'WIT', luck: 'SZCZ' };
 
@@ -98,12 +100,21 @@ module.exports = {
             if (i.customId === 'eq_equip') {
                 const rowId = Number(i.values[0]);
                 const res = await equipItem(db, interaction.user.id, rowId);
+
+                const eqMap = await getEquippedMap(db, interaction.user.id);
+                const eqArr = SLOT_ORDER.map((s) => eqMap[s]).filter(Boolean);
+                const maxPieces = activeSets(eqArr).reduce((m, s) => Math.max(m, s.count), 0);
+                if (maxPieces > 0) await setStatMax(db, interaction.user.id, 'max_set_pieces', maxPieces);
+                const newAch = await checkAchievements(db, interaction.user.id);
+
                 const view = await render(db, interaction.user.id, player.school);
                 if (res && res.equipped) {
                     let note = `Założono **${res.equipped.name}**`;
                     if (res.replaced) note += ` (zdjęto **${res.replaced.name}** do plecaka)`;
                     view.embeds[0].setFooter({ text: note });
                 }
+                const af = achievementsField(newAch);
+                if (af) view.embeds[0].addFields(af);
                 await i.update(view);
             }
         });

@@ -320,22 +320,30 @@ function performAttack(attacker, defender, log) {
  * Rozgrywa pelna walke miedzy graczem a potworem.
  * Zwraca { winner: 'player'|'monster', rounds, log, playerHpLeft }.
  */
-function simulateCombat(playerC, monsterC) {
+function simulateCombat(playerC, monsterC, opts = {}) {
     const log = [];
 
-    // Inicjatywa: szybszy (wyzsza Zrecznosc) zaczyna; remis -> gracz.
-    const playerFirst = playerC.stats.dex >= monsterC.stats.dex;
+    // Inicjatywa: szybszy (wyzsza Zrecznosc) zaczyna. Remis: w PvE -> gracz,
+    // w PvP -> losowo (zeby atakujacy nie mial systematycznej przewagi).
+    let playerFirst;
+    if (playerC.stats.dex === monsterC.stats.dex && opts.pvp) {
+        playerFirst = Math.random() < 0.5;
+    } else {
+        playerFirst = playerC.stats.dex >= monsterC.stats.dex;
+    }
     const order = playerFirst ? [playerC, monsterC] : [monsterC, playerC];
     if (!playerFirst) {
         log.push(`**${monsterC.name}** jest szybszy i atakuje pierwszy!`);
     }
 
     // Mantykora wchodzi do walki z wieczna regeneracja (mutageny) - dotyczy obu stron (PvP).
+    // W PvP regeneracja jest slabsza, by sustain nie dominowal pojedynkow miedzy graczami.
+    const regenPct = opts.pvp ? 0.009 : 0.014;
     if (playerC.schoolKey === 'mantykora') {
-        playerC.effects.push({ type: 'regen', pct: 0.018, turns: Infinity });
+        playerC.effects.push({ type: 'regen', pct: regenPct, turns: Infinity });
     }
     if (monsterC.schoolKey === 'mantykora') {
-        monsterC.effects.push({ type: 'regen', pct: 0.018, turns: Infinity });
+        monsterC.effects.push({ type: 'regen', pct: regenPct, turns: Infinity });
     }
 
     const MAX_ROUNDS = 60;

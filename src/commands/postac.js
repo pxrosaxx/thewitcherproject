@@ -5,7 +5,8 @@ const {
     TextInputStyle,
     ActionRowBuilder,
     ButtonBuilder,
-    ButtonStyle
+    ButtonStyle,
+    MessageFlags
 } = require('discord.js');
 const getDbConnection = require('../db');
 const schools = require('../data/schools');
@@ -102,14 +103,15 @@ module.exports = {
             const school = schools[existing.school];
             return interaction.reply({
                 content: `Masz już postać: **${existing.name}** (${school.name}, poziom ${existing.level}). Użyj \`/profil\`, żeby zobaczyć kartę postaci.`,
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
 
         // Gracz istnieje, ale nie dokończył wyboru szkoły
         if (existing && !existing.school) {
             const payload = buildSchoolSelection();
-            const msg = await interaction.reply({ ...payload, fetchReply: true });
+            await interaction.reply(payload);
+            const msg = await interaction.fetchReply();
             return awaitSchoolButton(interaction.user, msg, db, interaction.user.id, existing.name);
         }
 
@@ -146,7 +148,8 @@ module.exports = {
         ]);
 
         const payload = buildSchoolSelection();
-        const msg = await modalSubmit.reply({ ...payload, fetchReply: true });
+        await modalSubmit.reply(payload);
+        const msg = await modalSubmit.fetchReply();
         return awaitSchoolButton(interaction.user, msg, db, interaction.user.id, imie);
     }
 };

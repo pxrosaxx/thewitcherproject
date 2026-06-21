@@ -29,8 +29,8 @@ module.exports = {
         emoji: '🦅',
         description:
             'Wiedźmin zgłębiający magię Znaków. W każdej turze losowo tnie mieczem albo rzuca jeden z pięciu Znaków — Quen, Yrden, Igni, Aard lub Axii.',
-        baseStats: { str: 6, dex: 8, intel: 14, wit: 8, luck: 10 },
-        growth: { str: 1, dex: 1, intel: 4, wit: 2, luck: 2 }
+        baseStats: { str: 6, dex: 8, intel: 14, wit: 11, luck: 10 },
+        growth: { str: 1, dex: 1, intel: 4, wit: 3, luck: 2 }
     },
     waz: {
         key: 'waz',

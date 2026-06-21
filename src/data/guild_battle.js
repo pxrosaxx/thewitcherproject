@@ -55,7 +55,7 @@ function gauntlet(A, B) {
     while (ai < A.length && bi < B.length) {
         resetForDuel(A[ai].c);
         resetForDuel(B[bi].c);
-        const res = simulateCombat(A[ai].c, B[bi].c);
+        const res = simulateCombat(A[ai].c, B[bi].c, { pvp: true });
         if (res.winner === 'player') {
             log.push(`${A[ai].name} pokonał(a) ${B[bi].name} — został(a) z ${Math.round(A[ai].c.hp)} HP`);
             bi++;

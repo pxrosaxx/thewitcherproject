@@ -120,7 +120,7 @@ module.exports = {
         const oppBon = await getBonuses(db, opp.discord_id);
         applyTreasure(pcMe, myBon ? myBon.treasureMult : 1);
         applyTreasure(pcOpp, oppBon ? oppBon.treasureMult : 1);
-        const result = simulateCombat(pcMe, pcOpp);
+        const result = simulateCombat(pcMe, pcOpp, { pvp: true });
         const won = result.winner === 'player';
 
         // ELO (suma zerowa)

@@ -4,7 +4,7 @@
 //  bonus za dopasowanie do Szkoly, agregacja statow do walki, dropy i sklep.
 // =============================================================================
 
-const { ITEMS, ITEMS_BY_ID } = require('../data/items');
+const { ITEMS, SET_ITEMS, SET_BY_SCHOOL, ITEMS_BY_ID } = require('../data/items');
 
 // Statystyka ofensywna wg Szkoly (spojne z silnikiem walki).
 const SCHOOL_OFFENSE = { wilk: 'str', kot: 'dex', gryf: 'intel', waz: 'dex', mantykora: 'intel' };
@@ -70,7 +70,7 @@ function resolveProfile(slot, school) {
  */
 function generateItemStats(template, itemLevel) {
     const mult = RARITY[template.rarity].statMult;
-    const budget = Math.max(1, Math.round((1 + itemLevel * 0.15) * mult));
+    const budget = Math.max(2, Math.round((2 + itemLevel * 0.20) * mult));
     const profile = resolveProfile(template.slot, template.school);
 
     const stats = emptyStats();
@@ -221,6 +221,28 @@ function rollDrop(monsterLevel, zoneOffset = 0, isElite = false) {
     return makeItemInstance(template, itemLevel);
 }
 
+/**
+ * Tworzy część wiedźmińskiego rynsztunku danej szkoły (losowy slot).
+ * Rzadkość nadawana przy dropie (min. niezwykła), poziom = poziom potwora.
+ * To JEDYNE źródło części setowych — wyłącznie bossowie/elity lochów.
+ */
+function makeSetDrop(school, monsterLevel, zoneOffset = 0, isElite = false) {
+    const bySlot = SET_BY_SCHOOL[school];
+    if (!bySlot) return null;
+    const slot = SLOT_ORDER[Math.floor(Math.random() * SLOT_ORDER.length)];
+    const template = bySlot[slot];
+    if (!template) return null;
+    const rarity = Math.max(2, rollRarity(zoneOffset, isElite));
+    const itemLevel = Math.max(1, monsterLevel + randInt(-1, 1));
+    return makeItemInstance({ ...template, rarity }, itemLevel);
+}
+
+/** Z szansą `chance` zwraca część setową szkoły gracza, inaczej null. */
+function rollSetDrop(school, monsterLevel, zoneOffset = 0, isElite = false, chance = 0.3) {
+    if (!school || Math.random() > chance) return null;
+    return makeSetDrop(school, monsterLevel, zoneOffset, isElite);
+}
+
 // --- Sklep ---------------------------------------------------------------
 
 /** Generuje oferte sklepu (deterministyczna dla danego ziarna, np. dnia). */
@@ -281,6 +303,6 @@ module.exports = {
     SET_DEF, setBonus, activeSets,
     RARITY, SLOTS, SLOT_ORDER, SCHOOL_OFFENSE, AFFINITY_BONUS,
     generateItemStats, makeItemInstance, equipmentBonus, effectiveStats,
-    rollDrop, rollRarity, generateShop, itemPrice, sellPrice,
+    rollDrop, rollRarity, makeSetDrop, rollSetDrop, generateShop, itemPrice, sellPrice,
     rarityLabel, statsLine, formatItem
 };

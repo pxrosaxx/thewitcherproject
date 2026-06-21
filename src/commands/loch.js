@@ -10,7 +10,7 @@ const { combatantFromPlayer, combatantFromMonster, simulateCombat } = require('.
 const { calculateMaxHp, expForNextLevel, levelUpFromExp } = require('../game/character');
 const { refreshActionPoints, spendActionPoint, formatDuration } = require('../game/actionpoints');
 const {
-    effectiveStats, SLOT_ORDER, rollDrop, rollRarity, makeItemInstance, RARITY, formatItem
+    effectiveStats, SLOT_ORDER, rollDrop, rollRarity, rollSetDrop, makeItemInstance, RARITY, formatItem
 } = require('../game/equipment');
 const { ITEMS } = require('../data/items');
 const { getEquippedMap, addItem } = require('../game/inventory');
@@ -59,6 +59,13 @@ module.exports = {
             );
 
         const options = [];
+        if (all.length === 0) {
+            embed.addFields({
+                name: 'Brak lochów',
+                value: 'Nie zdefiniowano jeszcze żadnego lochu. Administrator może je dodać w pliku `data/dungeons.js` albo komendą `/loch-kreator`.',
+                inline: false
+            });
+        }
         for (const d of all) {
             const stage = progress[d.key] || 0;
             const locked = player.level < d.minLevel;
@@ -154,6 +161,7 @@ module.exports = {
         const stageLabel = isFinal ? 'Finałowy boss' : `Etap ${stage + 1}/${entry.stageCount}`;
 
         let drop = null;
+        let setDrop = null;
         const levelsGained = [];
 
         if (won) {
@@ -165,6 +173,12 @@ module.exports = {
 
             drop = isFinal ? bossDrop(entry.levelOffset, boss.level) : rollDrop(boss.level, entry.levelOffset, false);
             if (drop) await addItem(db, interaction.user.id, drop);
+
+            // Część wiedźmińskiego rynsztunku — tylko z lochów, dla szkoły gracza.
+            // Boss finałowy: 30% (lepsza rzadkość). Mini-boss (elita): 12%.
+            const setChance = isFinal ? 0.30 : 0.12;
+            setDrop = rollSetDrop(fresh.school, boss.level, entry.levelOffset, isFinal, setChance);
+            if (setDrop) await addItem(db, interaction.user.id, setDrop);
 
             fresh.hp = fresh.max_hp;
             await db.run(
@@ -211,6 +225,9 @@ module.exports = {
             }
             if (drop) {
                 finalEmbed.addFields({ name: `Łup — ${RARITY[drop.rarity].name}`, value: formatItem(drop), inline: false });
+            }
+            if (setDrop) {
+                finalEmbed.addFields({ name: `⚔️ Część rynsztunku! — ${RARITY[setDrop.rarity].name}`, value: formatItem(setDrop), inline: false });
             }
             if (isFinal) {
                 finalEmbed.addFields({ name: 'Loch zaliczony', value: `Pokonałeś wszystkich bossów: **${entry.name}**.`, inline: false });

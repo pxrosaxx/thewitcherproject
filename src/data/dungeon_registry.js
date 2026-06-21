@@ -1,22 +1,24 @@
 // =============================================================================
-//  REJESTR LOCHÓW — łączy lochy wbudowane (monsters/dungeons) z własnymi (baza).
-//  /loch korzysta z jednego, spójnego interfejsu, nie wiedząc skąd loch pochodzi.
+//  REJESTR LOCHÓW — łączy lochy zdefiniowane w danych (data/dungeons.js)
+//  z własnymi tworzonymi w grze (/loch-kreator). /loch korzysta z jednego,
+//  spójnego interfejsu, nie wiedząc skąd loch pochodzi.
 // =============================================================================
 
-const { LOCATIONS, LOCATION_ORDER } = require('./monsters');
 const dungeons = require('./dungeons');
 const custom = require('./custom_dungeons');
 
-/** Zwraca wszystkie lochy: wbudowane + własne (te z co najmniej 1 potworem). */
+/** Zwraca wszystkie lochy: zdefiniowane w danych + własne (te z co najmniej 1 potworem). */
 async function listDungeons(db) {
-    const builtin = LOCATION_ORDER.map((key) => ({
-        key,
-        name: LOCATIONS[key].name,
-        minLevel: LOCATIONS[key].minLevel,
-        levelOffset: LOCATIONS[key].levelOffset,
-        stageCount: dungeons.STAGES_PER_LOCATION,
-        isCustom: false
-    }));
+    const builtin = Object.entries(dungeons.DUNGEONS)
+        .filter(([, d]) => d.stages && d.stages.length > 0)
+        .map(([key, d]) => ({
+            key,
+            name: d.name,
+            minLevel: d.minLevel,
+            levelOffset: d.levelOffset != null ? d.levelOffset : Math.min(4, Math.floor((d.minLevel - 1) / 8)),
+            stageCount: d.stages.length,
+            isCustom: false
+        }));
 
     const customs = await custom.listDungeons(db);
     const customEntries = customs
@@ -34,7 +36,7 @@ async function listDungeons(db) {
     return [...builtin, ...customEntries];
 }
 
-/** Boss danego etapu — dispatch wbudowany/własny. */
+/** Boss danego etapu — dispatch zdefiniowany/własny. */
 async function getBossFor(db, entry, stageIndex) {
     if (!entry.isCustom) return dungeons.getBoss(entry.key, stageIndex);
     return custom.getCustomBoss(db, entry.dungeonId, stageIndex, entry.minLevel, entry.stageCount);

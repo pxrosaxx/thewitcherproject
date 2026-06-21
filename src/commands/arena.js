@@ -9,7 +9,7 @@ const {
     ARENA_COOLDOWN, MIN_HONOR, honorDelta, cooldownLeft, buildCombatant, crownReward
 } = require('../game/arena');
 const { formatDuration } = require('../game/actionpoints');
-const { baseEmbed, authorFor, outcomeColor } = require('../utils/embeds');
+const { baseEmbed, authorFor, outcomeColor, combatEmbed } = require('../utils/embeds');
 const { revealCombat } = require('../utils/combat_anim');
 const { checkAchievements, achievementsField } = require('../data/achievements');
 const { getBonuses } = require('../data/guilds');
@@ -153,19 +153,29 @@ module.exports = {
         const newAch = await checkAchievements(db, interaction.user.id);
 
         const header = `**${fresh.name}** vs **${opp.name}**\n${schools[fresh.school].name} przeciw ${schools[opp.school].name}`;
-        const logText = formatLog(result.log);
-        const displayLines = logText.split('\n');
+        const raw = result.log;
+        const hp = result.hpStates;
+        const pMax = result.playerMaxHp, mMax = result.monsterMaxHp;
+        const hpAt = (n) => hp[Math.min(Math.max(n, 1), hp.length) - 1] || { p: pMax, m: mMax };
 
-        const makeFrame = (visible) =>
-            baseEmbed('Pojedynek').setAuthor(authorFor(fresh)).setDescription(`${header}\n\n${visible.join('\n')}`);
+        const makeFrame = (visible) => {
+            const st = hpAt(visible.length);
+            return combatEmbed({
+                title: 'Pojedynek', author: authorFor(fresh), header,
+                pName: fresh.name, pHp: st.p, pMax, mName: opp.name, mHp: st.m, mMax,
+                logLines: visible.slice(-12)
+            });
+        };
 
-        const finalEmbed = baseEmbed(won ? 'Zwycięstwo w arenie' : 'Porażka w arenie')
-            .setColor(outcomeColor(won)).setAuthor(authorFor(fresh))
-            .setDescription(header)
-            .addFields(
-                { name: 'Przebieg walki', value: logText, inline: false },
-                { name: 'Punkty chwały', value: `${fresh.honor} → **${myNewHonor}** (${deltaTxt})\nPozycja w rankingu: **#${newRank}**`, inline: false }
-            );
+        const stF = hp[hp.length - 1] || { p: result.playerHpLeft, m: won ? 0 : mMax };
+        const finalEmbed = combatEmbed({
+            title: won ? 'Zwycięstwo w arenie' : 'Porażka w arenie',
+            color: outcomeColor(won), author: authorFor(fresh), header,
+            pName: fresh.name, pHp: stF.p, pMax, mName: opp.name, mHp: stF.m, mMax
+        }).addFields(
+            { name: 'Przebieg walki', value: formatLog(result.log), inline: false },
+            { name: 'Punkty chwały', value: `${fresh.honor} → **${myNewHonor}** (${deltaTxt})\nPozycja w rankingu: **#${newRank}**`, inline: false }
+        );
 
         if (won) {
             let nagrody = `**+${gainedCrowns}** koron`;
@@ -177,6 +187,6 @@ module.exports = {
         finalEmbed.setFooter({ text: `Następna walka za ${formatDuration(ARENA_COOLDOWN)}` });
 
         await choice.deferUpdate();
-        await revealCombat(interaction, displayLines, makeFrame, finalEmbed);
+        await revealCombat(interaction, raw, makeFrame, finalEmbed, { steps: Math.min(12, Math.max(4, Math.ceil(raw.length / 2))), delayMs: 850 });
     }
 };

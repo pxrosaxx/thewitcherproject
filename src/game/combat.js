@@ -349,6 +349,15 @@ function simulateCombat(playerC, monsterC, opts = {}) {
     const MAX_ROUNDS = 60;
     let round = 0;
 
+    // Migawki HP po kazdej linii logu (do animacji paskow zycia). Rownolegle do `log`.
+    const hpStates = [];
+    const snapHp = () => {
+        while (hpStates.length < log.length) {
+            hpStates.push({ p: Math.max(0, Math.round(playerC.hp)), m: Math.max(0, Math.round(monsterC.hp)) });
+        }
+    };
+    snapHp(); // linia wstepna (inicjatywa) — HP pelne
+
     while (playerC.hp > 0 && monsterC.hp > 0 && round < MAX_ROUNDS) {
         round++;
         for (const attacker of order) {
@@ -357,6 +366,7 @@ function simulateCombat(playerC, monsterC, opts = {}) {
 
             // Efekty na poczatku tury (DoT, regen).
             tickEffects(attacker, log);
+            snapHp();
             if (attacker.hp <= 0) break;
 
             // Ogluszenie - tracimy ture.
@@ -365,6 +375,7 @@ function simulateCombat(playerC, monsterC, opts = {}) {
                 attacker.effects = attacker.effects.map((e) =>
                     e.type === 'stun' ? { ...e, turns: e.turns - 1 } : e
                 ).filter((e) => e.turns > 0);
+                snapHp();
                 continue;
             }
 
@@ -379,15 +390,22 @@ function simulateCombat(playerC, monsterC, opts = {}) {
             }
 
             performAttack(attacker, realDefender, log);
+            snapHp();
         }
     }
+    snapHp();
 
     let winner;
     if (playerC.hp <= 0 && monsterC.hp > 0) winner = 'monster';
     else if (monsterC.hp <= 0 && playerC.hp > 0) winner = 'player';
     else winner = playerC.hp / playerC.maxHp >= monsterC.hp / monsterC.maxHp ? 'player' : 'monster';
 
-    return { winner, rounds: round, log, playerHpLeft: Math.max(0, playerC.hp) };
+    return {
+        winner, rounds: round, log, playerHpLeft: Math.max(0, playerC.hp),
+        hpStates,
+        playerMaxHp: playerC.maxHp, monsterMaxHp: monsterC.maxHp,
+        playerName: playerC.name, monsterName: monsterC.name
+    };
 }
 
 module.exports = {

@@ -15,7 +15,7 @@ const {
 const { ITEMS } = require('../data/items');
 const { getEquippedMap, addItem } = require('../game/inventory');
 const { baseWithBought } = require('../game/training');
-const { baseEmbed, progressBar, authorFor, outcomeColor } = require('../utils/embeds');
+const { baseEmbed, progressBar, authorFor, outcomeColor, combatEmbed } = require('../utils/embeds');
 const { imageForName } = require('../data/monster_images');
 const { revealCombat } = require('../utils/combat_anim');
 const { applyLoadout } = require('../data/alchemy');
@@ -193,23 +193,30 @@ module.exports = {
 
         const newAch = won ? await checkAchievements(db, interaction.user.id) : [];
 
-        // --- Oprawa: nagłówek, grafika potwora, animacja krok po kroku ---
+        // --- Oprawa: nagłówek, paski życia, animacja krok po kroku ---
         const monsterImg = boss.imageUrl || imageForName(boss.name);
         const header = `**${boss.name}** — poziom ${boss.level}\n${entry.name} · ${stageLabel}`;
-        const logText = formatLog(result.log);
-        const displayLines = logText.split('\n');
+        const raw = result.log;
+        const hp = result.hpStates;
+        const pMax = result.playerMaxHp, mMax = result.monsterMaxHp;
+        const hpAt = (n) => hp[Math.min(Math.max(n, 1), hp.length) - 1] || { p: pMax, m: mMax };
 
         const makeFrame = (visible) => {
-            const e = baseEmbed('Walka').setAuthor(authorFor(fresh))
-                .setDescription(`${header}\n\n${visible.join('\n')}`);
-            if (monsterImg) e.setImage(monsterImg);
-            return e;
+            const st = hpAt(visible.length);
+            return combatEmbed({
+                title: 'Walka', author: authorFor(fresh), header,
+                pName: fresh.name, pHp: st.p, pMax, mName: boss.name, mHp: st.m, mMax,
+                logLines: visible.slice(-12), image: monsterImg
+            });
         };
 
         const title = won ? (isFinal ? 'Lochy ukończone' : 'Etap pokonany') : 'Porażka';
-        const finalEmbed = baseEmbed(title).setColor(outcomeColor(won)).setAuthor(authorFor(fresh))
-            .setDescription(header)
-            .addFields({ name: 'Przebieg walki', value: logText, inline: false });
+        const stF = hp[hp.length - 1] || { p: result.playerHpLeft, m: won ? 0 : mMax };
+        const finalEmbed = combatEmbed({
+            title, color: outcomeColor(won), author: authorFor(fresh), header,
+            pName: fresh.name, pHp: stF.p, pMax, mName: boss.name, mHp: stF.m, mMax,
+            image: monsterImg
+        }).addFields({ name: 'Przebieg walki', value: formatLog(result.log), inline: false });
         if (usedConsumables.length > 0) {
             finalEmbed.addFields({ name: 'Alchemia', value: usedConsumables.join(', '), inline: false });
         }
@@ -243,6 +250,6 @@ module.exports = {
         if (monsterImg) finalEmbed.setImage(monsterImg);
 
         await choice.deferUpdate();
-        await revealCombat(interaction, displayLines, makeFrame, finalEmbed);
+        await revealCombat(interaction, raw, makeFrame, finalEmbed, { steps: Math.min(12, Math.max(4, Math.ceil(raw.length / 2))), delayMs: 850 });
     }
 };

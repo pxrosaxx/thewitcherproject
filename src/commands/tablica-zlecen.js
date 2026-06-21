@@ -11,7 +11,7 @@ const {
     combatantFromPlayer, combatantFromMonster, simulateCombat
 } = require('../game/combat');
 const { getStatsAtLevel, calculateMaxHp, expForNextLevel, levelUpFromExp } = require('../game/character');
-const { baseEmbed, progressBar, authorFor, outcomeColor } = require('../utils/embeds');
+const { baseEmbed, progressBar, authorFor, outcomeColor, combatEmbed } = require('../utils/embeds');
 const { effectiveStats, SLOT_ORDER, rollDrop, formatItem, RARITY } = require('../game/equipment');
 const { getEquippedMap, addItem } = require('../game/inventory');
 const { baseWithBought } = require('../game/training');
@@ -246,20 +246,27 @@ module.exports = {
         // --- EKRAN WYNIKOWY (z animacją krok po kroku) ---
         const monsterImg = imageForName(quest.monster.name);
         const header = `*${quest.story}*\n\n**${quest.monster.name}** — poziom ${quest.monster.level} · ${quest.loc.name}`;
-        const logText = formatLog(result.log);
-        const displayLines = logText.split('\n');
+        const raw = result.log;
+        const hp = result.hpStates;
+        const pMax = result.playerMaxHp, mMax = result.monsterMaxHp;
+        const hpAt = (n) => hp[Math.min(Math.max(n, 1), hp.length) - 1] || { p: pMax, m: mMax };
 
         const makeFrame = (visible) => {
-            const e = baseEmbed('Walka').setAuthor(authorFor(fresh))
-                .setDescription(`${header}\n\n${visible.join('\n')}`);
-            if (monsterImg) e.setImage(monsterImg);
-            return e;
+            const st = hpAt(visible.length);
+            return combatEmbed({
+                title: 'Walka', author: authorFor(fresh), header,
+                pName: fresh.name, pHp: st.p, pMax, mName: quest.monster.name, mHp: st.m, mMax,
+                logLines: visible.slice(-12), image: monsterImg
+            });
         };
 
-        const finalEmbed = baseEmbed(won ? 'Zlecenie ukończone' : 'Zlecenie nieudane')
-            .setColor(outcomeColor(won)).setAuthor(authorFor(fresh))
-            .setDescription(header)
-            .addFields({ name: 'Przebieg walki', value: logText, inline: false });
+        const stF = hp[hp.length - 1] || { p: result.playerHpLeft, m: won ? 0 : mMax };
+        const finalEmbed = combatEmbed({
+            title: won ? 'Zlecenie ukończone' : 'Zlecenie nieudane',
+            color: outcomeColor(won), author: authorFor(fresh), header,
+            pName: fresh.name, pHp: stF.p, pMax, mName: quest.monster.name, mHp: stF.m, mMax,
+            image: monsterImg
+        }).addFields({ name: 'Przebieg walki', value: formatLog(result.log), inline: false });
         if (usedConsumables.length > 0) {
             finalEmbed.addFields({ name: 'Alchemia', value: usedConsumables.join(', '), inline: false });
         }
@@ -289,6 +296,6 @@ module.exports = {
         finalEmbed.setFooter({ text: `Awanturniczość: ${fresh.stamina}/100  ·  Passa: ${newStreak}` });
 
         await choice.deferUpdate();
-        await revealCombat(interaction, displayLines, makeFrame, finalEmbed);
+        await revealCombat(interaction, raw, makeFrame, finalEmbed, { steps: Math.min(12, Math.max(4, Math.ceil(raw.length / 2))), delayMs: 850 });
     }
 };

@@ -42,8 +42,132 @@
 const STAT_BASE = 6;
 const STAT_PER_LVL = 3.0;
 
-// >>> TUTAJ DODAJ SWOJE LOCHY <<<
+// 11 lochów fabularnych (od poziomu 1 do 100). Ostatni etap = boss finałowy.
 const DUNGEONS = {
+    droga_z_ktorej: {
+        name: "DROGA, Z KTÓREJ SIĘ NIE WRACA", minLevel: 1,
+        stages: [
+            {name: "Manissa",kind: "caster",offense: "intel",weaponMult: 1.7,hpMult: 1,traits: []},
+            {name: "Bladooki",kind: "default",offense: "str",weaponMult: 1.6,hpMult: 1.1,traits: []},
+            {name: "Kehl",kind: "armored",offense: "str",weaponMult: 1.6,hpMult: 1.3,traits: []},
+            {name: "Fregenal",kind: "caster",offense: "intel",weaponMult: 1.7,hpMult: 1,traits: []},
+            {name: "Kościej",kind: "frenzy",offense: "str",weaponMult: 1.7,hpMult: 1.2,traits: ["frenzy"]}
+        ]
+    },
+    rozdroze_krukow: {
+        name: "ROZDROŻE KRUKÓW", minLevel: 10,
+        stages: [
+            {name: "Dezerter",kind: "default",offense: "str",weaponMult: 1.6,hpMult: 1.1,traits: []},
+            {name: "Cibor Ponti",kind: "default",offense: "str",weaponMult: 1.6,hpMult: 1.1,traits: []},
+            {name: "Kikimora",kind: "fast",offense: "dex",weaponMult: 1.6,hpMult: 1,traits: ["venomous"]},
+            {name: "Mamutak",kind: "armored",offense: "str",weaponMult: 1.6,hpMult: 1.3,traits: []},
+            {name: "Zorril",kind: "fast",offense: "dex",weaponMult: 1.6,hpMult: 1,traits: []},
+            {name: "Artamon z Asguth",kind: "caster",offense: "intel",weaponMult: 1.7,hpMult: 1,traits: []},
+            {name: "Beauregard Frick",kind: "default",offense: "str",weaponMult: 1.6,hpMult: 1.1,traits: []},
+            {name: "Meritxell, Ponti, Frick",kind: "default",offense: "str",weaponMult: 1.6,hpMult: 1.1,traits: []},
+            {name: "Strzyga z Brunanburh",kind: "frenzy",offense: "str",weaponMult: 1.7,hpMult: 1.2,traits: ["frenzy"]}
+        ]
+    },
+    ostatnie_zyczenie: {
+        name: "OSTATNIE ŻYCZENIE", minLevel: 20,
+        stages: [
+            {name: "Strzyga",kind: "default",offense: "str",weaponMult: 1.6,hpMult: 1.1,traits: []},
+            {name: "Bruxa",kind: "fast",offense: "dex",weaponMult: 1.6,hpMult: 1,traits: []},
+            {name: "Renfri",kind: "fast",offense: "dex",weaponMult: 1.6,hpMult: 1,traits: []},
+            {name: "Jeż z Erlenwardu",kind: "caster",offense: "intel",weaponMult: 1.7,hpMult: 1,traits: []},
+            {name: "Silvan Torque",kind: "armored",offense: "str",weaponMult: 1.6,hpMult: 1.3,traits: []},
+            {name: "Dżinn",kind: "caster",offense: "intel",weaponMult: 1.7,hpMult: 1,traits: []}
+        ]
+    },
+    sezon_burz: {
+        name: "SEZON BURZ", minLevel: 30,
+        stages: [
+            {name: "Idr",kind: "fast",offense: "dex",weaponMult: 1.6,hpMult: 1,traits: ["venomous"]},
+            {name: "Wigilozaur",kind: "frenzy",offense: "str",weaponMult: 1.7,hpMult: 1.2,traits: ["frenzy"]},
+            {name: "Bue i Bang",kind: "frenzy",offense: "str",weaponMult: 1.7,hpMult: 1.2,traits: ["frenzy"]},
+            {name: "Brehen",kind: "fast",offense: "dex",weaponMult: 1.6,hpMult: 1,traits: []},
+            {name: "Aguara",kind: "frenzy",offense: "str",weaponMult: 1.6,hpMult: 1.1,traits: ["lifesteal"]},
+            {name: "Sorel Albert Amador Degerlund",kind: "caster",offense: "intel",weaponMult: 1.7,hpMult: 1,traits: []}
+        ]
+    },
+    miecz_przeznaczenia: {
+        name: "MIECZ PRZEZNACZENIA", minLevel: 40,
+        stages: [
+            {name: "Vodyanoi",kind: "default",offense: "str",weaponMult: 1.6,hpMult: 1.1,traits: []},
+            {name: "Nekrofag",kind: "fast",offense: "dex",weaponMult: 1.6,hpMult: 1,traits: []},
+            {name: "Bazyliszek",kind: "fast",offense: "dex",weaponMult: 1.6,hpMult: 1,traits: ["venomous"]},
+            {name: "Rębacze z Crinfrid",kind: "frenzy",offense: "str",weaponMult: 1.7,hpMult: 1.2,traits: ["frenzy"]},
+            {name: "Skolopendromorf Yghern",kind: "fast",offense: "dex",weaponMult: 1.6,hpMult: 1,traits: []}
+        ]
+    },
+    krew_elfow: {
+        name: "KREW ELFÓW", minLevel: 50,
+        stages: [
+            {name: "Fałszywa Straż Temerska",kind: "default",offense: "str",weaponMult: 1.6,hpMult: 1.1,traits: []},
+            {name: "Komando Scoia'tael",kind: "fast",offense: "dex",weaponMult: 1.6,hpMult: 1,traits: []},
+            {name: "Żagnica",kind: "frenzy",offense: "str",weaponMult: 1.7,hpMult: 1.2,traits: ["frenzy"]},
+            {name: "Bracia Michelet",kind: "frenzy",offense: "str",weaponMult: 1.7,hpMult: 1.2,traits: ["frenzy"]},
+            {name: "Rience",kind: "caster",offense: "intel",weaponMult: 1.7,hpMult: 1,traits: []}
+        ]
+    },
+    czas_pogardy: {
+        name: "CZAS POGARDY", minLevel: 60,
+        stages: [
+            {name: "Skomlik i Łapacze",kind: "default",offense: "str",weaponMult: 1.6,hpMult: 1.1,traits: []},
+            {name: "Młoda Wywerna",kind: "default",offense: "str",weaponMult: 1.6,hpMult: 1.1,traits: []},
+            {name: "Ralf Blunden, Heimo Kantor i Krótki Yaxa",kind: "fast",offense: "dex",weaponMult: 1.6,hpMult: 1,traits: []},
+            {name: "Potwór z pustyni Korath",kind: "fast",offense: "dex",weaponMult: 1.6,hpMult: 1,traits: []},
+            {name: "Artaud Terranova",kind: "caster",offense: "intel",weaponMult: 1.7,hpMult: 1,traits: []},
+            {name: "Vilgefortz z Roggeveen",kind: "caster",offense: "intel",weaponMult: 1.7,hpMult: 1,traits: []}
+        ]
+    },
+    chrzest_ognia: {
+        name: "CHRZEST OGNIA", minLevel: 70,
+        stages: [
+            {name: "Ghule",kind: "default",offense: "str",weaponMult: 1.6,hpMult: 1.1,traits: []},
+            {name: "Havekarzy",kind: "armored",offense: "str",weaponMult: 1.6,hpMult: 1.3,traits: []},
+            {name: "Agenci Vattiera",kind: "armored",offense: "str",weaponMult: 1.6,hpMult: 1.3,traits: []},
+            {name: "Marszałek Vissegerd",kind: "default",offense: "str",weaponMult: 1.6,hpMult: 1.1,traits: []},
+            {name: "Okogłów",kind: "default",offense: "str",weaponMult: 1.6,hpMult: 1.1,traits: []}
+        ]
+    },
+    wieza_jaskolki: {
+        name: "WIEŻA JASKÓŁKI", minLevel: 80,
+        stages: [
+            {name: "Barbegazi",kind: "default",offense: "str",weaponMult: 1.6,hpMult: 1.1,traits: []},
+            {name: "Echinops",kind: "fast",offense: "dex",weaponMult: 1.6,hpMult: 1,traits: ["venomous"]},
+            {name: "Pukacz",kind: "armored",offense: "str",weaponMult: 1.6,hpMult: 1.3,traits: []},
+            {name: "Schirru",kind: "fast",offense: "dex",weaponMult: 1.6,hpMult: 1,traits: []},
+            {name: "Słowik",kind: "default",offense: "str",weaponMult: 1.6,hpMult: 1.1,traits: []},
+            {name: "Drzewce",kind: "armored",offense: "str",weaponMult: 1.6,hpMult: 1.3,traits: []},
+            {name: "Rience",kind: "caster",offense: "intel",weaponMult: 1.7,hpMult: 1,traits: []},
+            {name: "Leo Bonhart",kind: "frenzy",offense: "str",weaponMult: 1.7,hpMult: 1.2,traits: ["frenzy"]}
+        ]
+    },
+    pani_jeziora: {
+        name: "PANI JEZIORA", minLevel: 90,
+        stages: [
+            {name: "Solpuga",kind: "fast",offense: "dex",weaponMult: 1.6,hpMult: 1,traits: ["venomous"]},
+            {name: "Kuroliszek",kind: "fast",offense: "dex",weaponMult: 1.6,hpMult: 1,traits: ["venomous"]},
+            {name: "Pan Schweitzer",kind: "frenzy",offense: "str",weaponMult: 1.7,hpMult: 1.2,traits: ["frenzy"]},
+            {name: "Stefan Skellen",kind: "default",offense: "str",weaponMult: 1.6,hpMult: 1.1,traits: []},
+            {name: "Eredin Bréacc Glas",kind: "default",offense: "str",weaponMult: 1.6,hpMult: 1.1,traits: []},
+            {name: "Leo Bonhart",kind: "frenzy",offense: "str",weaponMult: 1.7,hpMult: 1.2,traits: ["frenzy"]},
+            {name: "Vilgefortz z Roggeveen",kind: "caster",offense: "intel",weaponMult: 1.7,hpMult: 1,traits: []}
+        ]
+    },
+    cos_sie_konczy: {
+        name: "COŚ SIĘ KOŃCZY, COŚ SIĘ ZACZYNA", minLevel: 100,
+        stages: [
+            {name: "Upiór Szczypiący w Pośladki",kind: "fast",offense: "dex",weaponMult: 1.6,hpMult: 1,traits: []},
+            {name: "Vissing „Łup-Cup”",kind: "armored",offense: "str",weaponMult: 1.6,hpMult: 1.3,traits: []},
+            {name: "Pijany Vesemir",kind: "default",offense: "str",weaponMult: 1.6,hpMult: 1.1,traits: []},
+            {name: "Borch Trzy Kawki",kind: "armored",offense: "str",weaponMult: 1.6,hpMult: 1.3,traits: []},
+            {name: "Pijany Jaskier",kind: "fast",offense: "dex",weaponMult: 1.6,hpMult: 1,traits: []},
+            {name: "Nenneke",kind: "caster",offense: "intel",weaponMult: 1.7,hpMult: 1,traits: []},
+            {name: "Yennefer w Furii",kind: "caster",offense: "intel",weaponMult: 1.7,hpMult: 1,traits: []}
+        ]
+    },
 };
 
 // Domyslny profil bossa; modyfikowany przez kind.

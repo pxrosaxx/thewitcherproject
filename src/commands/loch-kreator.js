@@ -18,7 +18,7 @@ module.exports = {
             .setName('stworz')
             .setDescription('Stwórz nowy loch.')
             .addStringOption((o) => o.setName('nazwa').setDescription('Nazwa lochu').setRequired(true))
-            .addIntegerOption((o) => o.setName('poziom').setDescription('Poziom odblokowania (1-60)').setRequired(true).setMinValue(1).setMaxValue(60)))
+            .addIntegerOption((o) => o.setName('poziom').setDescription('Poziom odblokowania (1-200)').setRequired(true).setMinValue(1).setMaxValue(200)))
         .addSubcommand((s) => s
             .setName('dodaj')
             .setDescription('Dodaj potwora do lochu (kolejny etap; ostatni = finałowy boss).')

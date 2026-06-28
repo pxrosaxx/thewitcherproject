@@ -1,5 +1,5 @@
 // =============================================================================
-//  BITWY GILDII (Etap 16) — Gildenkampf w stylu SFGame.
+//  BITWY GILDII (Etap 16) — wojny między gildiami.
 //  Szyki obu gildii stają do sekwencji pojedynków „król wzgórza": zwycięzca
 //  walczy dalej z RESZTKĄ ŻYCIA przeciw kolejnemu wrogowi (pełne HP), aż jedna
 //  strona zostanie wybita. Rozstrzygane natychmiast (PvP asynchroniczne).

@@ -50,7 +50,7 @@ module.exports = {
             embed.addFields({ name: `${def.name}${mine}`, value, inline: false });
         }
 
-        embed.setFooter({ text: 'Części zdobywasz w lochu, karczmie i arenie. Wzmacniaj je u kowala.' });
+        embed.setFooter({ text: 'Części zdobywasz w podziemiach, ze zleceń i na arenie. Wzmacniaj je u kowala.' });
         await interaction.reply({ embeds: [embed] });
     }
 };

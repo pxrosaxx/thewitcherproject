@@ -30,17 +30,17 @@ const ACHIEVEMENTS = [
     { id: 'mon500', name: 'Rzeźnik Potworów',  category: 'Łowy', metric: 'monsters_defeated', threshold: 500, title: 'Rzeźnik z Blaviken', crowns: 2000, ears: 2 },
 
     // --- LOCHY ---
-    { id: 'boss10', name: 'Łowca Bossów',  category: 'Lochy', metric: 'bosses_defeated',     threshold: 10, crowns: 300 },
-    { id: 'boss50', name: 'Zmora Bossów',  category: 'Lochy', metric: 'bosses_defeated',     threshold: 50, title: 'Zmora Bossów', crowns: 1000 },
-    { id: 'loc1',   name: 'Zdobywca',      category: 'Lochy', metric: 'locations_completed', threshold: 1,  title: 'Zdobywca',     crowns: 400 },
-    { id: 'loc3',   name: 'Pan Lochów',    category: 'Lochy', metric: 'locations_completed', threshold: 3,  title: 'Pan Lochów',   crowns: 1000 },
-    { id: 'loc5',   name: 'Władca Krain',  category: 'Lochy', metric: 'locations_completed', threshold: 5,  title: 'Władca Krain', crowns: 2500, ears: 3 },
+    { id: 'boss10', name: 'Łowca Bossów',  category: 'Podziemia', metric: 'bosses_defeated',     threshold: 10, crowns: 300 },
+    { id: 'boss50', name: 'Zmora Bossów',  category: 'Podziemia', metric: 'bosses_defeated',     threshold: 50, title: 'Zmora Bossów', crowns: 1000 },
+    { id: 'loc1',   name: 'Zdobywca',      category: 'Podziemia', metric: 'locations_completed', threshold: 1,  title: 'Zdobywca',     crowns: 400 },
+    { id: 'loc3',   name: 'Pan Podziemi',    category: 'Podziemia', metric: 'locations_completed', threshold: 3,  title: 'Pan Podziemi',   crowns: 1000 },
+    { id: 'loc5',   name: 'Władca Krain',  category: 'Podziemia', metric: 'locations_completed', threshold: 5,  title: 'Władca Krain', crowns: 2500, ears: 3 },
 
-    // --- KARCZMA ---
-    { id: 'con25',   name: 'Najemnik',     category: 'Karczma', metric: 'contracts_done', threshold: 25,  crowns: 150 },
-    { id: 'con100',  name: 'Zawodowiec',   category: 'Karczma', metric: 'contracts_done', threshold: 100, title: 'Zawodowiec',  crowns: 600 },
-    { id: 'streak10', name: 'Nieprzerwany', category: 'Karczma', metric: 'win_streak',    threshold: 10,  title: 'Nieprzerwany', crowns: 400 },
-    { id: 'streak25', name: 'Niepokonany',  category: 'Karczma', metric: 'win_streak',    threshold: 25,  title: 'Niepokonany',  crowns: 1200, ears: 1 },
+    // --- ZLECENIA ---
+    { id: 'con25',   name: 'Najemnik',     category: 'Zlecenia', metric: 'contracts_done', threshold: 25,  crowns: 150 },
+    { id: 'con100',  name: 'Zawodowiec',   category: 'Zlecenia', metric: 'contracts_done', threshold: 100, title: 'Zawodowiec',  crowns: 600 },
+    { id: 'streak10', name: 'Nieprzerwany', category: 'Zlecenia', metric: 'win_streak',    threshold: 10,  title: 'Nieprzerwany', crowns: 400 },
+    { id: 'streak25', name: 'Niepokonany',  category: 'Zlecenia', metric: 'win_streak',    threshold: 25,  title: 'Niepokonany',  crowns: 1200, ears: 1 },
 
     // --- KOWAL ---
     { id: 'upg10', name: 'Płatnerz',     category: 'Kowal', metric: 'items_upgraded', threshold: 10, crowns: 200 },
@@ -128,8 +128,8 @@ async function setTitle(db, discordId, title) {
 function thresholdLabel(a) {
     const labels = {
         level: 'poziom', honor: 'honor', arena_wins: 'wygrane areny', daily_streak: 'passa logowań',
-        win_streak: 'passa karczmy', crowns: 'korony', ears: 'Uszy', monsters_defeated: 'pokonani wrogowie',
-        bosses_defeated: 'pokonani bossowie', locations_completed: 'ukończone lochy', contracts_done: 'kontrakty',
+        win_streak: 'passa zleceń', crowns: 'korony', ears: 'Uszy', monsters_defeated: 'pokonani wrogowie',
+        bosses_defeated: 'pokonani bossowie', locations_completed: 'ukończone podziemia', contracts_done: 'kontrakty',
         items_upgraded: 'ulepszenia', potions_brewed: 'uwarzone mikstury', potions_used: 'użyte mikstury',
         max_set_pieces: 'części kompletu', guild_joined: 'gildia', guild_donated: 'wpłacono do gildii', portal_clears: 'pokonane portale', guild_war_wins: 'wygrane wojny'
     };

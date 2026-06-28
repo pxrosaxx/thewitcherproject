@@ -27,7 +27,7 @@ for (const cat of CATEGORIES) {
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('alchemia')
-        .setDescription('Warz mikstury i ustaw zestaw na walki w lochu i karczmie.')
+        .setDescription('Warz mikstury i ustaw zestaw na walki w podziemiach i na zleceniach.')
         .addSubcommand((s) => s
             .setName('warz')
             .setDescription('Uwarz miksturę (płacisz koronami, mocne za Uszy).')
@@ -112,7 +112,7 @@ module.exports = {
 
             const embed = baseEmbed('Zestaw alchemiczny').setAuthor(authorFor(player))
                 .setDescription(summary.join('\n'))
-                .setFooter({ text: 'Każda walka w lochu/karczmie zużywa po 1 sztuce z zapasu.' });
+                .setFooter({ text: 'Każda walka w podziemiu lub na zleceniu zużywa po 1 sztuce z zapasu.' });
             return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
         }
 
@@ -141,7 +141,7 @@ module.exports = {
             const list = byCategory(cat).map((c) => `**${c.name}** — ${costLabel(c)}\n_${c.desc}_`).join('\n');
             embed.addFields({ name: `${CATEGORY_LABEL[cat]}y`, value: list, inline: false });
         }
-        embed.setFooter({ text: 'Limit: 1 eliksir + 1 olej + 1 bomba na walkę. Działa w lochu i karczmie.' });
+        embed.setFooter({ text: 'Limit: 1 eliksir + 1 olej + 1 bomba na walkę. Działa w podziemiach i na zleceniach.' });
 
         return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     }

@@ -1,5 +1,5 @@
 // =============================================================================
-//  GILDIE (Etap 15) — model inspirowany SFGame.
+//  GILDIE (Etap 15) — wspólne struktury graczy.
 //  • Skarbiec  — wpłaty koron, ulepszenia; +1%/poziom do STATYSTYK członków.
 //  • Akademia  — j.w.; +1%/poziom do DOŚWIADCZENIA członków.
 //  • Portal    — wspólny boss; każdy bije raz dziennie; po pokonaniu nagroda

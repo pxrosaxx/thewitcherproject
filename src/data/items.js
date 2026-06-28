@@ -1,6 +1,6 @@
 // =============================================================================
 //  KATALOG PRZEDMIOTOW
-//  ITEMS      — sprzet NEUTRALNY (sklep, karczma, zwykle potwory). Bez przynaleznosci szkolnej.
+//  ITEMS      — sprzet NEUTRALNY (sklep, zlecenia, zwykle potwory). Bez przynaleznosci szkolnej.
 //  SET_ITEMS  — 30 czesci wiedzminskiego rynsztunku: 6 slotow × 5 szkol. To JEDYNE czesci setowe,
 //               nadawane wylacznie z bossow/elit lochow. Rzadkosc nadawana przy dropie.
 //  Statystyki generowane proceduralnie (patrz game/equipment.js).

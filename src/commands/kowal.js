@@ -65,7 +65,7 @@ module.exports = {
         const all = [...equipped, ...backpack];
 
         if (all.length === 0) {
-            return interaction.reply({ embeds: [baseEmbed('Kowal').setDescription('Nie masz żadnego przedmiotu do ulepszenia. Zdobądź sprzęt w lochu, karczmie lub sklepie.')] });
+            return interaction.reply({ embeds: [baseEmbed('Kowal').setDescription('Nie masz żadnego przedmiotu do ulepszenia. Zdobądź sprzęt w podziemiach, ze zleceń lub w sklepie.')] });
         }
 
         const intro = baseEmbed('Kowal')

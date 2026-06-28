@@ -31,7 +31,7 @@ async function ensureTavernColumns(db) {
     try { await db.run("ALTER TABLE players ADD COLUMN ears INTEGER DEFAULT 0"); } catch (e) {}
 }
 
-// Sprawdza i odnawia 100 pkt Awanturniczości co 12 godzin (o 00:00 i 12:00 UTC).
+// Sprawdza i odnawia 100 pkt Wytrzymałości co 12 godzin (o 00:00 i 12:00 UTC).
 async function refreshStamina(db, player) {
     const HALF_DAY_MS = 12 * 60 * 60 * 1000;
     const period = String(Math.floor(Date.now() / HALF_DAY_MS)); // identyfikator okna 12 h
@@ -56,8 +56,8 @@ function formatLog(log, maxLines = 16) {
 
 module.exports = {
     data: new SlashCommandBuilder()
-    .setName('karczma')
-    .setDescription('Wybierz jedno z 3 zleceń z tablicy. Wymaga Awanturniczości.'),
+    .setName('tablica-zlecen')
+    .setDescription('Wybierz jedno z 3 zleceń z tablicy. Wymaga Wytrzymałości.'),
 
     async execute(interaction) {
         const db = await getDbConnection();
@@ -78,8 +78,8 @@ module.exports = {
         player.last_stamina_reset = today;
 
         if (player.stamina <= 0) {
-            const noEnergyEmbed = baseEmbed('Karczma')
-            .setDescription('Jesteś całkowicie wyczerpany. Nie masz już siły na zlecenia.\nAwanturniczość odnawia się co 12 godzin (o 00:00 i 12:00).');
+            const noEnergyEmbed = baseEmbed('Tablica zleceń')
+            .setDescription('Jesteś całkowicie wyczerpany. Nie masz już siły na zlecenia.\nWytrzymałość odnawia się co 12 godzin (o 00:00 i 12:00).');
             return interaction.reply({ embeds: [noEnergyEmbed] });
         }
 
@@ -97,8 +97,8 @@ module.exports = {
 
         const quests = [];
         const row = new ActionRowBuilder();
-        const selectEmbed = baseEmbed('Karczma — Tablica zleceń')
-        .setDescription(`Witaj, **${player.name}**. Na tablicy wiszą trzy świeże zlecenia.\nAwanturniczość: **${player.stamina}/100**  ·  Passa: **${player.win_streak || 0}**`);
+        const selectEmbed = baseEmbed('Tablica zleceń')
+        .setDescription(`Witaj, **${player.name}**. Na tablicy wiszą trzy świeże zlecenia.\nWytrzymałość: **${player.stamina}/100**  ·  Passa: **${player.win_streak || 0}**`);
 
         for (const qt of questTypes) {
             // Losujemy lokację z odblokowanych
@@ -122,14 +122,14 @@ module.exports = {
                 value:
                     `*${story}*\n` +
                     `Cel: **${monster.name}** (poz. ${monster.level}) — ${loc.name}\n` +
-                    `Koszt: ${qt.cost} Awanturniczości  ·  Nagroda: ${expReward} exp, ${crownReward} koron`,
+                    `Koszt: ${qt.cost} Wytrzymałości  ·  Nagroda: ${expReward} exp, ${crownReward} koron`,
                 inline: false
             });
 
             // Dodajemy przyciski, blokujemy te, na które gracz nie ma już energii
             row.addComponents(
                 new ButtonBuilder()
-                .setCustomId(`karczma_${qt.id}`)
+                .setCustomId(`zlecenie_${qt.id}`)
                 .setLabel(`Zlecenie ${qt.id + 1}`)
                 .setStyle(qt.style)
                 .setDisabled(player.stamina < qt.cost)
@@ -142,12 +142,12 @@ module.exports = {
         let choice;
         try {
             choice = await message.awaitMessageComponent({
-                filter: (i) => i.user.id === interaction.user.id && i.customId.startsWith('karczma_'),
+                filter: (i) => i.user.id === interaction.user.id && i.customId.startsWith('zlecenie_'),
                                                          componentType: ComponentType.Button,
                                                          time: 60000
             });
         } catch {
-            const expired = baseEmbed('Karczma').setDescription('Zbyt długo się zastanawiałeś — ktoś inny wziął te zlecenia. Użyj `/karczma` ponownie.');
+            const expired = baseEmbed('Tablica zleceń').setDescription('Zbyt długo się zastanawiałeś — ktoś inny wziął te zlecenia. Użyj `/tablica-zlecen` ponownie.');
             await interaction.editReply({ embeds: [expired], components: [] }).catch(() => {});
             return;
         }
@@ -162,7 +162,7 @@ module.exports = {
 
         if (fresh.stamina < quest.cost) {
             return await choice.update({
-                embeds: [baseEmbed('Brak sił').setDescription('Zabrakło Ci Awanturniczości na to zlecenie.')],
+                embeds: [baseEmbed('Brak sił').setDescription('Zabrakło Ci Wytrzymałości na to zlecenie.')],
                                        components: []
             });
         }
@@ -296,7 +296,7 @@ module.exports = {
         const af = achievementsField(newAch);
         if (af) finalEmbed.addFields(af);
         if (monsterImg) finalEmbed.setImage(monsterImg);
-        finalEmbed.setFooter({ text: `Awanturniczość: ${fresh.stamina}/100  ·  Passa: ${newStreak}` });
+        finalEmbed.setFooter({ text: `Wytrzymałość: ${fresh.stamina}/100  ·  Passa: ${newStreak}` });
 
         await choice.deferUpdate();
         await revealCombat(interaction, raw, makeFrame, finalEmbed, { steps: Math.min(12, Math.max(4, Math.ceil(raw.length / 2))), delayMs: 850 });

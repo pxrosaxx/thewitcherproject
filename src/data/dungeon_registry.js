@@ -1,6 +1,6 @@
 // =============================================================================
 //  REJESTR LOCHÓW — łączy lochy zdefiniowane w danych (data/dungeons.js)
-//  z własnymi tworzonymi w grze (/loch-kreator). /loch korzysta z jednego,
+//  z własnymi (z bazy). /podziemia korzysta z jednego,
 //  spójnego interfejsu, nie wiedząc skąd loch pochodzi.
 // =============================================================================
 

@@ -39,7 +39,7 @@ function bossDrop(levelOffset, level) {
 }
 
 module.exports = {
-    data: new SlashCommandBuilder().setName('loch').setDescription('Przemierzaj lokacje, pokonuj bossów etap po etapie.'),
+    data: new SlashCommandBuilder().setName('podziemia').setDescription('Przemierzaj lokacje, pokonuj bossów etap po etapie.'),
 
     async execute(interaction) {
         const db = await getDbConnection();
@@ -52,7 +52,7 @@ module.exports = {
         const progress = await getAllProgress(db, interaction.user.id);
         const all = await listDungeons(db);
 
-        const embed = baseEmbed('Lochy').setAuthor(authorFor(player))
+        const embed = baseEmbed('Podziemia').setAuthor(authorFor(player))
             .setDescription(
                 `Punkty akcji: **${ap.points}/${ap.max}**` +
                 (ap.points < ap.max ? `  (następny za ${formatDuration(ap.secondsToNext)})` : '')
@@ -61,8 +61,8 @@ module.exports = {
         const options = [];
         if (all.length === 0) {
             embed.addFields({
-                name: 'Brak lochów',
-                value: 'Nie zdefiniowano jeszcze żadnego lochu. Administrator może je dodać w pliku `data/dungeons.js` albo komendą `/loch-kreator`.',
+                name: 'Brak podziemi',
+                value: 'Nie zdefiniowano jeszcze żadnego podziemia. Administrator może je dodać w pliku `data/dungeons.js`.',
                 inline: false
             });
         }
@@ -100,7 +100,7 @@ module.exports = {
         const canPlay = options.length > 0 && ap.points > 0;
         const components = canPlay
             ? [new ActionRowBuilder().addComponents(
-                new StringSelectMenuBuilder().setCustomId('loch_pick').setPlaceholder('Wybierz loch').addOptions(options.slice(0, 25)))]
+                new StringSelectMenuBuilder().setCustomId('podziemia_pick').setPlaceholder('Wybierz podziemie').addOptions(options.slice(0, 25)))]
             : [];
 
         await interaction.reply({ embeds: [embed], components });
@@ -110,7 +110,7 @@ module.exports = {
         let choice;
         try {
             choice = await message.awaitMessageComponent({
-                filter: (i) => i.user.id === interaction.user.id && i.customId === 'loch_pick',
+                filter: (i) => i.user.id === interaction.user.id && i.customId === 'podziemia_pick',
                 componentType: ComponentType.StringSelect, time: 60000
             });
         } catch {
@@ -121,17 +121,17 @@ module.exports = {
         const fresh = await db.get('SELECT * FROM players WHERE discord_id = ?', interaction.user.id);
         await refreshActionPoints(db, fresh);
         if ((fresh.action_points || 0) <= 0) {
-            return choice.update({ embeds: [baseEmbed('Lochy').setDescription('Nie masz już punktów akcji.')], components: [] });
+            return choice.update({ embeds: [baseEmbed('Podziemia').setDescription('Nie masz już punktów akcji.')], components: [] });
         }
 
         const key = choice.values[0];
         const entry = (await listDungeons(db)).find((d) => d.key === key);
         if (!entry) {
-            return choice.update({ embeds: [baseEmbed('Lochy').setDescription('Ten loch już nie istnieje.')], components: [] });
+            return choice.update({ embeds: [baseEmbed('Podziemia').setDescription('To podziemie już nie istnieje.')], components: [] });
         }
         const stage = await getProgress(db, interaction.user.id, key);
         if (stage >= entry.stageCount) {
-            return choice.update({ embeds: [baseEmbed('Lochy').setDescription('Ten loch jest już ukończony.')], components: [] });
+            return choice.update({ embeds: [baseEmbed('Podziemia').setDescription('To podziemie jest już ukończone.')], components: [] });
         }
 
         await spendActionPoint(db, fresh);
@@ -210,7 +210,7 @@ module.exports = {
             });
         };
 
-        const title = won ? (isFinal ? 'Lochy ukończone' : 'Etap pokonany') : 'Porażka';
+        const title = won ? (isFinal ? 'Podziemia ukończone' : 'Etap pokonany') : 'Porażka';
         const stF = hp[hp.length - 1] || { p: result.playerHpLeft, m: won ? 0 : mMax };
         const finalEmbed = combatEmbed({
             title, color: outcomeColor(won), author: authorFor(fresh), header,
@@ -237,7 +237,7 @@ module.exports = {
                 finalEmbed.addFields({ name: `⚔️ Część rynsztunku! — ${RARITY[setDrop.rarity].name}`, value: formatItem(setDrop), inline: false });
             }
             if (isFinal) {
-                finalEmbed.addFields({ name: 'Loch zaliczony', value: `Pokonałeś wszystkich bossów: **${entry.name}**.`, inline: false });
+                finalEmbed.addFields({ name: 'Podziemie zaliczone', value: `Pokonałeś wszystkich bossów: **${entry.name}**.`, inline: false });
             } else {
                 const next = await getBossFor(db, entry, stage + 1);
                 if (next) finalEmbed.setFooter({ text: `Następny: ${next.name} (poz. ${next.level})` });

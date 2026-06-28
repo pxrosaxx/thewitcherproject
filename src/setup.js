@@ -148,7 +148,7 @@ const CREATE_PLAYER_ACHIEVEMENTS = `
     )
 `;
 
-// Gildie (Etap 15) — model SFGame: skarbiec, akademia, portal.
+// Gildie (Etap 15): skarbiec, akademia, portal.
 const CREATE_GUILDS = `
     CREATE TABLE IF NOT EXISTS guilds (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

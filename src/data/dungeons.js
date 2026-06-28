@@ -1,11 +1,11 @@
 // =============================================================================
 //  LOCHY — DEFINIOWANE PRZEZ CIEBIE
 //  Wbudowane lochy zostaly usuniete. Tutaj definiujesz wlasne lochy i potwory.
-//  Mozesz tez tworzyc lochy w grze komenda /loch-kreator (archetypy potworow).
+//  Lochy (podziemia) definiujesz w tym pliku.
 //
 //  Kazdy loch w DUNGEONS:
 //    klucz: {                       // unikalny klucz (male litery, bez spacji)
-//      name: 'Nazwa Lochu',         // nazwa widoczna w /loch
+//      name: "Nazwa podziemia",   // nazwa widoczna w /podziemia
 //      minLevel: 1,                 // poziom 1. etapu (kolejne etapy +1)
 //      levelOffset: 0,              // (opcjonalne) trudnosc strefy 0-4; domyslnie z minLevel
 //      stages: [ ...potwory... ]    // lista etapow; OSTATNI = boss finalowy

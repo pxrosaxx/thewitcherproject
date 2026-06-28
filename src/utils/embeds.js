@@ -56,7 +56,7 @@ function combatBars(pName, pHp, pMax, mName, mHp, mMax) {
 /**
  * Wspolny embed walki — sekcje rozdzielone liniami:
  *   naglowek  ──  paski zycia  ──  log  [+ pola: nagrody/alchemia]
- * Uzywany jako klatka animacji i jako embed koncowy (loch / karczma / arena).
+ * Uzywany jako klatka animacji i jako embed koncowy (podziemia / zlecenia / arena).
  */
 function combatEmbed({ title, color, author, header, pName, pHp, pMax, mName, mHp, mMax, logLines, image, fields }) {
     const e = baseEmbed(title);

@@ -55,7 +55,7 @@ module.exports = {
         const apValue = `${ap.points}/${ap.max}` +
             (ap.points < ap.max ? `\n*następny za ${formatDuration(ap.secondsToNext)}*` : '');
 
-        // Awanturnicznosc (resetuje sie o polnocy w karczmie).
+        // Wytrzymalosc (odnawia sie co 12 godzin).
         const today = new Date().toISOString().split('T')[0];
         const stamina = player.last_stamina_reset === today ? player.stamina : 100;
         const maxStamina = 100;
@@ -69,7 +69,7 @@ module.exports = {
                 { name: 'Korony', value: `${player.crowns}`, inline: true },
                 { name: 'Punkty życia', value: `${effMaxHp} / ${effMaxHp}\n${progressBar(1, 1)}`, inline: false },
                 { name: 'Punkty akcji', value: apValue, inline: true },
-                { name: 'Awanturniczość', value: `${stamina}/${maxStamina}`, inline: true },
+                { name: 'Wytrzymałość', value: `${stamina}/${maxStamina}`, inline: true },
                 { name: 'Uszy', value: `${player.ears || 0}`, inline: true },
                 { name: 'Chwała areny', value: `${player.honor ?? 1000} _(${player.arena_wins || 0}W/${player.arena_losses || 0}P)_`, inline: false },
                 { name: 'Siła', value: fmt('str'), inline: true },

@@ -50,7 +50,7 @@ async function render(db, discordId, schoolKey) {
 
     // Plecak
     if (backpack.length === 0) {
-        embed.addFields({ name: 'Plecak', value: '_pusty — zdobywaj przedmioty w lochach (`/loch`)_', inline: false });
+        embed.addFields({ name: 'Plecak', value: '_pusty — zdobywaj przedmioty w podziemiach (`/podziemia`)_', inline: false });
     } else {
         const lines = backpack.slice(0, 15).map((it) => {
             const match = it.school === schoolKey ? ' ★' : (it.school ? ` (szkoła: ${it.school})` : '');

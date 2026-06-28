@@ -7,7 +7,7 @@
 const { ITEMS, SET_ITEMS, SET_BY_SCHOOL, ITEMS_BY_ID } = require('../data/items');
 
 // Statystyka ofensywna wg Szkoly (spojne z silnikiem walki).
-const SCHOOL_OFFENSE = { wilk: 'str', kot: 'dex', gryf: 'intel', waz: 'dex', mantykora: 'intel' };
+const SCHOOL_OFFENSE = { wilk: 'str', kot: 'dex', gryf: 'intel', waz: 'dex', mantykora: 'intel', niedzwiedz: 'str' };
 
 // Bonus za noszenie przedmiotu zgodnego ze swoja Szkola.
 const AFFINITY_BONUS = 0.2; // +20%
@@ -120,7 +120,8 @@ const SET_DEF = {
     kot:       { name: 'Komplet Kota',      stats: { dex: 1.0, luck: 0.4 } },
     gryf:      { name: 'Komplet Gryfa',     stats: { intel: 1.0, wit: 0.4 } },
     waz:       { name: 'Komplet Żmii',      stats: { dex: 1.0, luck: 0.5 } },
-    mantykora: { name: 'Komplet Mantykory', stats: { intel: 1.0, wit: 0.5 } }
+    mantykora: { name: 'Komplet Mantykory', stats: { intel: 1.0, wit: 0.5 } },
+    niedzwiedz: { name: 'Komplet Niedźwiedzia', stats: { str: 1.0, wit: 0.6 } }
 };
 const SET_FACTOR = 0.10; // jak mocno bonus rośnie z poziomem sprzętu
 

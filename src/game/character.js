@@ -21,7 +21,7 @@ function calculateMaxHp(stats, level) {
 
 /** Ile exp trzeba, zeby przejsc z danego poziomu na kolejny. */
 function expForNextLevel(level) {
-    return Math.floor(100 * Math.pow(level, 1.4));
+    return Math.floor(50 * Math.pow(level, 1.22));
 }
 
 // --- Wspolna matematyka bojowa ------------------------------------------
@@ -45,7 +45,9 @@ function dodgeChance(stats) {
  * Malejace zyski - pancerz nigdy nie daje 100% odpornosci.
  */
 function damageReduction(defenseStat) {
-    return defenseStat / (defenseStat + 80);
+    // Sufit 60% - inaczej na wysokim poziomie redukcja zblizalaby sie do 100%,
+    // przez co zwykle ciosy grzezna, a wygrywaja tylko efekty ignorujace pancerz.
+    return Math.min(0.6, defenseStat / (defenseStat + 80));
 }
 
 /**

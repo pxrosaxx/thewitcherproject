@@ -16,10 +16,11 @@ const {
 // Statystyka ofensywna i mnoznik broni dla kazdej Szkoly.
 const SCHOOL_COMBAT = {
     wilk:      { offense: 'str',   weaponMult: 2.0, hits: 1 },
-    kot:       { offense: 'dex',   weaponMult: 1.7, hits: 1 },
-    waz:       { offense: 'dex',   weaponMult: 1.4, hits: 2 },
-    gryf:      { offense: 'intel', weaponMult: 2.4, hits: 1 },
-    mantykora: { offense: 'intel', weaponMult: 1.4, hits: 1 }
+    kot:       { offense: 'dex',   weaponMult: 2.2, hits: 1 },
+    waz:       { offense: 'dex',   weaponMult: 1.6, hits: 2 },
+    gryf:      { offense: 'intel', weaponMult: 1.8, hits: 1 },
+    mantykora: { offense: 'intel', weaponMult: 1.4, hits: 1 },
+    niedzwiedz: { offense: 'str',   weaponMult: 1.6, hits: 1 }
 };
 
 const SIGNS = ['igni', 'aard', 'quen', 'yrden', 'axii'];
@@ -44,6 +45,7 @@ function combatantFromPlayer(player, school) {
         offenseKey: cfg.offense,
         weaponMult: cfg.weaponMult,
         hits: cfg.hits,
+        isMagic: player.school === 'gryf', // Mag: ataki przebijają uniki i bloki
         maxHp: player.max_hp,
         hp: player.max_hp,
         effects: [],
@@ -66,6 +68,7 @@ function combatantFromMonster(monster) {
         offenseKey: monster.offense || 'str',
         weaponMult: monster.weaponMult || 1.6,
         hits: 1,
+        isMagic: monster.magic === true,
         maxHp: monster.maxHp,
         hp: monster.maxHp,
         effects: [],
@@ -81,7 +84,7 @@ function addEffect(target, effect) {
     const existing = target.effects.find((e) => e.type === effect.type);
     if (existing) {
         if (effect.type === 'poison') {
-            existing.stacks = Math.min(5, existing.stacks + 1);
+            existing.stacks = Math.min(3, existing.stacks + 1);
             existing.turns = Math.max(existing.turns, effect.turns);
         } else {
             existing.turns = Math.max(existing.turns, effect.turns);
@@ -105,7 +108,7 @@ function totalWeaken(target) {
 
 /** Czy zawodnik jest niemal odporny na obrazenia od czasu (Mantykora). */
 function dotResistance(target) {
-    return target.schoolKey === 'mantykora' ? 0.5 : 0;
+    return target.schoolKey === 'mantykora' ? 0 : 0;
 }
 
 /**
@@ -155,6 +158,11 @@ function applyDamage(attacker, defender, amount, log, opts = {}) {
         log.push(`**${defender.name}** blokuje cios Znakiem Quen!`);
         return 0;
     }
+    if (defender.braceNext) {
+        defender.braceNext = false;
+        amount = Math.max(1, Math.round(amount * 0.7));
+        log.push(`**${defender.name}** w postawie obronnej łagodzi cios!`);
+    }
     defender.hp -= amount;
 
     if (attacker && attacker.traits.includes('lifesteal')) {
@@ -166,12 +174,37 @@ function applyDamage(attacker, defender, amount, log, opts = {}) {
 }
 
 /**
- * Standardowe trafienie broni. Zwraca {dodged, crit, damage} i NIE aplikuje
+ * Szansa na unik z uwzglednieniem Szkoly i typu ataku.
+ * - Magii (Gryf) nie da sie uniknac.
+ * - Zwiadowca (Kot) to mistrz unikow (limit 50%), Zabojca (Waz) 40%, reszta 35%.
+ * - Doktor Zarazy (Mantykora) robi uniki, gdy atakujacy wrog jest zatruty.
+ */
+function effectiveDodge(defender, attacker) {
+    if (attacker.isMagic) return 0;
+    let cap;
+    switch (defender.schoolKey) {
+        case 'kot': cap = 0.5; break;
+        case 'waz': cap = 0.4; break;
+        default: cap = 0.35;
+    }
+    let d = Math.min(cap, defender.stats.dex * 0.006);
+    if (defender.schoolKey === 'mantykora' && hasEffect(attacker, 'poison')) {
+        d = Math.min(0.3, d + 0.10);
+    }
+    return d;
+}
+
+/**
+ * Standardowe trafienie broni. Zwraca {dodged, blocked, crit, damage} i NIE aplikuje
  * jeszcze obrazen (pozwala to szkolom modyfikowac wynik).
  */
 function rollHit(attacker, defender, multiplier) {
-    if (chance(dodgeChance(defender.stats))) {
-        return { dodged: true, crit: false, damage: 0 };
+    if (chance(effectiveDodge(defender, attacker))) {
+        return { dodged: true, blocked: false, crit: false, damage: 0 };
+    }
+    // Wojownik i Paladyn: Tarcza - szansa na zablokowanie fizycznego ciosu (nie dziala na magie).
+    if ((defender.schoolKey === 'wilk' || defender.schoolKey === 'niedzwiedz') && !attacker.isMagic && chance(0.30)) {
+        return { dodged: false, blocked: true, crit: false, damage: 0 };
     }
 
     let dmg = attacker.stats[attacker.offenseKey] * multiplier * rand(0.85, 1.15);
@@ -184,6 +217,10 @@ function rollHit(attacker, defender, multiplier) {
     if (attacker.traits.includes('frenzy') && attacker.hp < attacker.maxHp * 0.4) {
         dmg *= 1.35;
     }
+    // Paladyn: Pogromca magii - podwojone obrazenia istotom magicznym (zmora Gryfa).
+    if (attacker.schoolKey === 'niedzwiedz' && defender.isMagic) {
+        dmg *= 2.0;
+    }
 
     // Oslabienie (Yrden) zmniejsza obrazenia atakujacego.
     dmg *= 1 - totalWeaken(attacker);
@@ -193,12 +230,12 @@ function rollHit(attacker, defender, multiplier) {
     const crit = chance(cc);
     if (crit) dmg *= CRIT_MULT;
 
-    // Redukcja z obrony celu; Wilk jako cel ma dodatkowe 5% (zaprawiony w bojach).
-    dmg *= 1 - damageReduction(defender.stats.wit);
-    if (defender.schoolKey === 'wilk') dmg *= 0.95;
-    if (defender.traits.includes('armored')) dmg *= 0.85;
+    // Redukcja z obrony celu (Witalnosc + pancerz potwora). Magia (Mag) ignoruje 40% redukcji.
+    let reduction = damageReduction(defender.stats.wit);
+    if (defender.traits.includes('armored')) reduction = Math.min(0.9, reduction + 0.15);
+    dmg *= 1 - reduction;
 
-    return { dodged: false, crit, damage: Math.max(1, Math.round(dmg)) };
+    return { dodged: false, blocked: false, crit, damage: Math.max(1, Math.round(dmg)) };
 }
 
 /** Wykonuje jedno standardowe trafienie wraz z logiem i aplikacja obrazen. */
@@ -208,7 +245,12 @@ function strike(attacker, defender, multiplier, log, label = 'atakuje') {
         log.push(`**${defender.name}** unika ciosu`);
         return res;
     }
+    if (res.blocked) {
+        log.push(`**${defender.name}** blokuje cios tarczą!`);
+        return res;
+    }
     const dealt = applyDamage(attacker, defender, res.damage, log);
+    res.landed = dealt > 0;
     if (dealt > 0) {
         const critTxt = res.crit ? ' *(krytyk)*' : '';
         log.push(`**${attacker.name}** ${label} za ${dealt}${critTxt}`);
@@ -266,18 +308,14 @@ function castSign(attacker, defender, log) {
 function performAttack(attacker, defender, log) {
     switch (attacker.schoolKey) {
         case 'kot': {
+            // Zwiadowca: pojedynczy cios; jego siłą są uniki (do 50%), nie liczba ciosów.
             strike(attacker, defender, attacker.weaponMult, log, 'tnie');
-            const secondChance = Math.min(0.5, 0.15 + attacker.stats.dex * 0.008);
-            if (defender.hp > 0 && chance(secondChance)) {
-                log.push(`Refleks! **${attacker.name}** uderza ponownie`);
-                strike(attacker, defender, attacker.weaponMult, log, 'tnie');
-            }
             break;
         }
         case 'waz': {
             for (let i = 0; i < 2 && defender.hp > 0; i++) {
                 const res = strike(attacker, defender, attacker.weaponMult, log, i === 0 ? 'tnie pierwszym ostrzem' : 'tnie drugim ostrzem');
-                if (res.crit && !res.dodged) {
+                if (res.crit && res.landed) {
                     addEffect(defender, { type: 'bleed', damage: Math.round(attacker.stats.dex * 0.28), turns: 2 });
                     log.push(`Krytyczne cięcie powoduje krwawienie!`);
                 }
@@ -294,9 +332,18 @@ function performAttack(attacker, defender, log) {
         }
         case 'mantykora': {
             const res = strike(attacker, defender, attacker.weaponMult, log, 'ciska bombą');
-            if (!res.dodged) {
-                addEffect(defender, { type: 'poison', damage: Math.round(attacker.stats.intel * 0.25), stacks: 1, turns: 3 });
+            if (res.landed) {
+                addEffect(defender, { type: 'poison', damage: Math.round(attacker.stats.intel * 0.30), stacks: 1, turns: 3 });
                 log.push(`Mikstura żre wroga (trucizna)`);
+            }
+            break;
+        }
+        case 'niedzwiedz': {
+            // Paladyn: solidny cios, po nim 50% szans na postawe obronna (lagodzi kolejne uderzenie).
+            strike(attacker, defender, attacker.weaponMult, log, 'uderza');
+            if (chance(0.4)) {
+                attacker.braceNext = true;
+                log.push(`**${attacker.name}** przyjmuje postawę obronną`);
             }
             break;
         }
@@ -305,7 +352,7 @@ function performAttack(attacker, defender, log) {
             // Wilk oraz wszystkie potwory: pojedynczy, solidny cios.
             // Cecha 'venomous' u potwora dokłada truciznę.
             const res = strike(attacker, defender, attacker.weaponMult, log, 'atakuje');
-            if (!res.dodged && attacker.traits.includes('venomous')) {
+            if (res.landed && attacker.traits.includes('venomous')) {
                 addEffect(defender, { type: 'poison', damage: Math.round(attacker.stats.str * 0.2), stacks: 1, turns: 3 });
                 log.push(`**${defender.name}** zostaje zatruty`);
             }
@@ -338,7 +385,7 @@ function simulateCombat(playerC, monsterC, opts = {}) {
 
     // Mantykora wchodzi do walki z wieczna regeneracja (mutageny) - dotyczy obu stron (PvP).
     // W PvP regeneracja jest slabsza, by sustain nie dominowal pojedynkow miedzy graczami.
-    const regenPct = opts.pvp ? 0.009 : 0.014;
+    const regenPct = 0; // Doktor Zarazy: zamiast regeneracji - uniki przy truciźnie
     if (playerC.schoolKey === 'mantykora') {
         playerC.effects.push({ type: 'regen', pct: regenPct, turns: Infinity });
     }

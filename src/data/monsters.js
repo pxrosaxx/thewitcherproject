@@ -122,7 +122,7 @@ function buildMonster(archetype, effLevel, isElite, name) {
 
     let maxHp = Math.round((40 + stats.wit * 5 + lvl * 5) * archetype.hpMult * (isElite ? 1.5 : 1));
 
-    const expReward = Math.round((22 + effLevel * 12) * (isElite ? 2 : 1));
+    const expReward = Math.round((30 + effLevel * 18) * (isElite ? 2 : 1));
     const crownReward = Math.round((7 + effLevel * 4) * (isElite ? 2.2 : 1));
 
     return {

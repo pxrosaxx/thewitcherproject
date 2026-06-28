@@ -169,7 +169,13 @@ const SET_ITEMS = [
     {id: "set_mantykora_rekawice", name: "Rękawice Szkoły Mantykory", slot: "rekawice", rarity: 4, school: "mantykora", set: true},
     {id: "set_mantykora_spodnie", name: "Spodnie Szkoły Mantykory", slot: "spodnie", rarity: 4, school: "mantykora", set: true},
     {id: "set_mantykora_buty", name: "Buty Szkoły Mantykory", slot: "buty", rarity: 4, school: "mantykora", set: true},
-    {id: "set_mantykora_kusza", name: "Kusza Szkoły Mantykory", slot: "kusza", rarity: 4, school: "mantykora", set: true}
+    {id: "set_mantykora_kusza", name: "Kusza Szkoły Mantykory", slot: "kusza", rarity: 4, school: "mantykora", set: true},
+    {id: "set_niedzwiedz_bron", name: "Miecz Szkoły Niedźwiedzia", slot: "bron", rarity: 4, school: "niedzwiedz", set: true},
+    {id: "set_niedzwiedz_napiersnik", name: "Napierśnik Szkoły Niedźwiedzia", slot: "napiersnik", rarity: 4, school: "niedzwiedz", set: true},
+    {id: "set_niedzwiedz_rekawice", name: "Rękawice Szkoły Niedźwiedzia", slot: "rekawice", rarity: 4, school: "niedzwiedz", set: true},
+    {id: "set_niedzwiedz_spodnie", name: "Spodnie Szkoły Niedźwiedzia", slot: "spodnie", rarity: 4, school: "niedzwiedz", set: true},
+    {id: "set_niedzwiedz_buty", name: "Buty Szkoły Niedźwiedzia", slot: "buty", rarity: 4, school: "niedzwiedz", set: true},
+    {id: "set_niedzwiedz_kusza", name: "Kusza Szkoły Niedźwiedzia", slot: "kusza", rarity: 4, school: "niedzwiedz", set: true}
 ];
 
 const ALL_ITEMS = [...ITEMS, ...SET_ITEMS];

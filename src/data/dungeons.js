@@ -202,7 +202,7 @@ function buildStageBoss(def, minLevel, stageIndex, stageCount) {
     const maxHp = Math.round((40 + stats.wit * 5 + statLevel * 5) * hpMult);
 
     const rewardMult = isFinal ? 3.5 : 1.5;
-    const expReward = Math.round((22 + nominalLevel * 12) * rewardMult);
+    const expReward = Math.round((30 + nominalLevel * 18) * rewardMult);
     const crownReward = Math.round((7 + nominalLevel * 4) * (isFinal ? 3.0 : 1.5));
 
     return {

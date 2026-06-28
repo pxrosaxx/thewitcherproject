@@ -6,7 +6,7 @@ const { getEquippedMap, getBackpack } = require('../game/inventory');
 const { baseEmbed } = require('../utils/embeds');
 
 const STAT_PL = { str: 'Siła', dex: 'Zręczność', intel: 'Inteligencja', wit: 'Witalność', luck: 'Szczęście' };
-const SET_ORDER = ['wilk', 'kot', 'gryf', 'waz', 'mantykora'];
+const SET_ORDER = ['wilk', 'kot', 'gryf', 'waz', 'mantykora', 'niedzwiedz'];
 
 module.exports = {
     data: new SlashCommandBuilder().setName('komplety').setDescription('Przeglądaj komplety szkół i swój postęp w ich zbieraniu.'),

@@ -31,18 +31,19 @@ async function ensureTavernColumns(db) {
     try { await db.run("ALTER TABLE players ADD COLUMN ears INTEGER DEFAULT 0"); } catch (e) {}
 }
 
-// Sprawdza i odnawia 100 pkt Awanturniczości o północy
+// Sprawdza i odnawia 100 pkt Awanturniczości co 12 godzin (o 00:00 i 12:00 UTC).
 async function refreshStamina(db, player) {
-    const today = new Date().toISOString().split('T')[0]; // Zwraca np. "2026-06-18"
+    const HALF_DAY_MS = 12 * 60 * 60 * 1000;
+    const period = String(Math.floor(Date.now() / HALF_DAY_MS)); // identyfikator okna 12 h
     let stamina = player.stamina !== undefined ? player.stamina : 100;
     let lastReset = player.last_stamina_reset || '';
 
-    if (lastReset !== today) {
+    if (lastReset !== period) {
         stamina = 100;
-        lastReset = today;
-        await db.run('UPDATE players SET stamina = 100, last_stamina_reset = ? WHERE discord_id = ?', today, player.discord_id);
+        lastReset = period;
+        await db.run('UPDATE players SET stamina = 100, last_stamina_reset = ? WHERE discord_id = ?', period, player.discord_id);
     }
-    return { points: stamina, today };
+    return { points: stamina, today: period };
 }
 
 /** Skraca dziennik walki do czytelnej dlugosci. */
@@ -78,18 +79,21 @@ module.exports = {
 
         if (player.stamina <= 0) {
             const noEnergyEmbed = baseEmbed('Karczma')
-            .setDescription('Jesteś całkowicie wyczerpany. Nie masz już siły na zlecenia.\nWróć po północy, aby odzyskać 100 punktów Awanturniczości.');
+            .setDescription('Jesteś całkowicie wyczerpany. Nie masz już siły na zlecenia.\nAwanturniczość odnawia się co 12 godzin (o 00:00 i 12:00).');
             return interaction.reply({ embeds: [noEnergyEmbed] });
         }
 
         const zones = unlockedLocations(player.level);
 
-        // --- GENEROWANIE 3 ZLECEŃ (Styl SFGame) ---
-        const questTypes = [
-            { id: 0, label: 'Krótkie', cost: 10, mult: 1, style: ButtonStyle.Success },
-            { id: 1, label: 'Średnie', cost: 20, mult: 2, style: ButtonStyle.Primary },
-            { id: 2, label: 'Długie',  cost: 30, mult: 3, style: ButtonStyle.Danger }
-        ];
+        // --- GENEROWANIE 3 ZLECEŃ: losowy koszt 1-30, nagroda proporcjonalna do kosztu ---
+        const randInt = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
+        const tierFor = (cost) =>
+            cost <= 10 ? { label: 'Krótkie', style: ButtonStyle.Success }
+                : cost <= 20 ? { label: 'Średnie', style: ButtonStyle.Primary }
+                    : { label: 'Długie', style: ButtonStyle.Danger };
+        const questTypes = [randInt(1, 30), randInt(1, 30), randInt(1, 30)]
+            .sort((a, b) => a - b)
+            .map((cost, id) => ({ id, cost, mult: cost / 10, elite: cost >= 22, ...tierFor(cost) }));
 
         const quests = [];
         const row = new ActionRowBuilder();
@@ -101,13 +105,12 @@ module.exports = {
             const locKey = zones[Math.floor(Math.random() * zones.length)];
             const loc = LOCATIONS[locKey];
 
-            // "Długie" zlecenie zawsze przeciw elicie — mocniejszy potwór
-            // z wyższego tieru nazw (bez doklejanego przedrostka "Elitarny").
-            const monster = getMonsterForLocation(locKey, player.level, qt.id === 2);
+            // Droższe zlecenie częściej przeciw elicie — mocniejszy potwór.
+            const monster = getMonsterForLocation(locKey, player.level, qt.elite);
 
-            // Skalujemy nagrody względem czasu (kosztu)
-            const expReward = monster.expReward * qt.mult;
-            const crownReward = monster.crownReward * qt.mult;
+            // Skalujemy nagrody proporcjonalnie do kosztu (mult = koszt / 10).
+            const expReward = Math.max(1, Math.round(monster.expReward * qt.mult));
+            const crownReward = Math.max(1, Math.round(monster.crownReward * qt.mult));
 
             // Narracja zlecenia z 3 filarów (tysiące kombinacji).
             const story = buildQuestText();
@@ -207,8 +210,8 @@ module.exports = {
                 gainedCrowns += streakBonus;
             }
 
-            // Waluta premium: Szansa na drop ucha (5% + szansa zależna od poziomu trudności zadania)
-            if (Math.random() < (0.05 + quest.id * 0.05)) {
+            // Waluta premium: 5% + bonus zależny od kosztu zlecenia (droższe = większa szansa).
+            if (Math.random() < (0.05 + (quest.cost / 30) * 0.10)) {
                 earsGained = 1;
                 fresh.ears = (fresh.ears || 0) + earsGained;
             }

@@ -5,7 +5,7 @@
 
 const OVERVIEW =
     'Witaj na **Szlaku Wiedźmina**! To gra RPG osadzona w świecie Wiedźmina: tworzysz postać, ' +
-    'wybierasz Szkołę, polujesz na potwory, zdobywasz ekwipunek i piniesz się w siłę.\n\n' +
+    'wybierasz Szkołę, polujesz na potwory, zdobywasz ekwipunek i pniesz się w siłę.\n\n' +
     '**Pętla rozgrywki:**\n' +
     '1. Stwórz postać i wybierz Szkołę — `/postac`\n' +
     '2. Bierz zlecenia w karczmie — `/karczma`\n' +
@@ -24,7 +24,7 @@ const TOPICS = [
         title: 'Pierwsze kroki',
         body:
             'Świeżo na Szlaku? Oto droga:\n\n' +
-            '**1. `/postac`** — stwórz postać i wybierz jedną z 5 Szkół. Szkoła określa styl walki ' +
+            '**1. `/postac`** — stwórz postać i wybierz jedną z 6 Szkół. Szkoła określa styl walki ' +
             'i statystyki startowe (możesz podejrzeć je w `/szkoly`).\n' +
             '**2. `/trening`** — wydaj korony na podbicie statystyk.\n' +
             '**3. `/karczma`** — bierz zlecenia na potwory. To główne źródło doświadczenia, koron i łupu.\n' +
